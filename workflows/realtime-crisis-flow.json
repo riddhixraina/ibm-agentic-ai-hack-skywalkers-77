@@ -1,0 +1,325 @@
+{
+  "flow_name": "RealTimeCrisisFlow",
+  "description": "Main flow that processes incoming customer messages and detects/responds to crises",
+  "trigger": {
+    "type": "webhook",
+    "method": "POST",
+    "endpoint": "/api/trigger-flow"
+  },
+  "steps": [
+    {
+      "step_id": "step_1",
+      "name": "Run CrisisDetector",
+      "type": "ai_skill",
+      "skill_name": "CrisisDetector",
+      "inputs": {
+        "text": "{{input.text}}",
+        "channel": "{{input.channel}}",
+        "metadata": "{{input.metadata}}"
+      },
+      "outputs": {
+        "is_crisis": "{{crisis_detector.is_crisis}}",
+        "crisis_score": "{{crisis_detector.crisis_score}}",
+        "crisis_type": "{{crisis_detector.crisis_type}}",
+        "reason": "{{crisis_detector.reason}}"
+      }
+    },
+    {
+      "step_id": "step_2",
+      "name": "Crisis Decision",
+      "type": "decision",
+      "condition": "{{crisis_detector.is_crisis}} == true && {{crisis_detector.crisis_score}} >= 0.7",
+      "true_branch": "HighSeverityBranch",
+      "false_branch": "LowSeverityBranch"
+    },
+    {
+      "branch_id": "HighSeverityBranch",
+      "steps": [
+        {
+          "step_id": "step_3a",
+          "name": "Run TriageClassifier",
+          "type": "ai_skill",
+          "skill_name": "TriageClassifier",
+          "inputs": {
+            "text": "{{input.text}}",
+            "crisis_type": "{{crisis_detector.crisis_type}}",
+            "crisis_score": "{{crisis_detector.crisis_score}}",
+            "sla_policy": "{\"p1_response_time\": \"5min\", \"p2_response_time\": \"1hour\"}"
+          },
+          "outputs": {
+            "priority": "{{triage.priority}}",
+            "suggested_template_id": "{{triage.suggested_template_id}}",
+            "required_actions": "{{triage.required_actions}}",
+            "fields": "{{triage.fields}}"
+          }
+        },
+        {
+          "step_id": "step_4a",
+          "name": "Run ResponseComposer",
+          "type": "ai_skill",
+          "skill_name": "ResponseComposer",
+          "inputs": {
+            "template_id": "{{triage.suggested_template_id}}",
+            "channel": "{{input.channel}}",
+            "custom_fields": "{{triage.fields}}",
+            "language": "en"
+          },
+          "outputs": {
+            "message_preview": "{{response.message}}",
+            "tone": "{{response.tone}}",
+            "sendable": "{{response.sendable}}"
+          }
+        },
+        {
+          "step_id": "step_5a",
+          "name": "Run GovernanceAuditor",
+          "type": "ai_skill",
+          "skill_name": "GovernanceAuditor",
+          "inputs": {
+            "planned_actions": "{{triage.required_actions}}",
+            "reply_text": "{{response.message}}",
+            "evidence": "{{crisis_detector}}",
+            "model_versions": "{\"crisis_detector\": \"granite-3.1\", \"composer\": \"granite-3.1\"}"
+          },
+          "outputs": {
+            "verdict": "{{governance.verdict}}",
+            "reasons": "{{governance.reasons}}",
+            "confidence": "{{governance.confidence}}"
+          }
+        },
+        {
+          "step_id": "step_6a",
+          "name": "Governance Decision",
+          "type": "decision",
+          "condition": "{{governance.verdict}}",
+          "branches": {
+            "APPROVE": "AutomatedActions",
+            "REVIEW_REQUIRED": "HumanReviewBranch",
+            "BLOCK": "BlockedBranch"
+          }
+        },
+        {
+          "branch_id": "AutomatedActions",
+          "steps": [
+            {
+              "step_id": "step_7a",
+              "name": "Execute Actions Loop",
+              "type": "loop",
+              "iterate_over": "{{triage.required_actions}}",
+              "steps": [
+                {
+                  "step_id": "step_7a_1",
+                  "name": "Action Router",
+                  "type": "switch",
+                  "variable": "{{current_action}}",
+                  "cases": {
+                    "create_ticket": {
+                      "type": "tool",
+                      "tool_name": "CreateTicket",
+                      "inputs": {
+                        "customer": "{{input.metadata.customer}}",
+                        "title": "{{input.text}}",
+                        "text": "{{input.text}}",
+                        "priority": "{{triage.priority}}"
+                      }
+                    },
+                    "post_social": {
+                      "type": "tool",
+                      "tool_name": "PostSocial",
+                      "inputs": {
+                        "channel": "{{input.channel}}",
+                        "message": "{{response.message}}",
+                        "dry_run": false
+                      }
+                    },
+                    "notify_ops": {
+                      "type": "tool",
+                      "tool_name": "NotifyOps",
+                      "inputs": {
+                        "priority": "{{triage.priority}}",
+                        "incident_id": "{{generate_incident_id}}",
+                        "summary": "{{crisis_detector.reason}}",
+                        "links": []
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "branch_id": "HumanReviewBranch",
+          "steps": [
+            {
+              "step_id": "step_8a",
+              "name": "Notify Ops for Review",
+              "type": "tool",
+              "tool_name": "NotifyOps",
+              "inputs": {
+                "priority": "P1",
+                "incident_id": "{{generate_incident_id}}",
+                "summary": "Human review required: {{governance.reasons}}",
+                "links": []
+              }
+            },
+            {
+              "step_id": "step_9a",
+              "name": "Wait for Human Approval",
+              "type": "wait",
+              "event": "human_approval",
+              "timeout": 3600
+            },
+            {
+              "step_id": "step_10a",
+              "name": "Resume or Reject",
+              "type": "decision",
+              "condition": "{{human_approval.decision}}",
+              "branches": {
+                "approve": "AutomatedActions",
+                "reject": "BlockedBranch"
+              }
+            }
+          ]
+        },
+        {
+          "branch_id": "BlockedBranch",
+          "steps": [
+            {
+              "step_id": "step_11a",
+              "name": "Log Blocked Action",
+              "type": "tool",
+              "tool_name": "IngestEvent",
+              "inputs": {
+                "event_type": "governance_check",
+                "data": {
+                  "verdict": "BLOCK",
+                  "reasons": "{{governance.reasons}}"
+                }
+              }
+            },
+            {
+              "step_id": "step_12a",
+              "name": "Create Internal Ticket",
+              "type": "tool",
+              "tool_name": "CreateTicket",
+              "inputs": {
+                "customer": {"id": "internal"},
+                "title": "BLOCKED: Governance violation",
+                "text": "{{governance.reasons}}",
+                "priority": "P0"
+              }
+            }
+          ]
+        },
+        {
+          "step_id": "step_13a",
+          "name": "Ingest Event",
+          "type": "tool",
+          "tool_name": "IngestEvent",
+          "inputs": {
+            "event_type": "crisis_detected",
+            "data": {
+              "crisis_detector": "{{crisis_detector}}",
+              "triage": "{{triage}}",
+              "response": "{{response}}",
+              "governance": "{{governance}}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "branch_id": "LowSeverityBranch",
+      "steps": [
+        {
+          "step_id": "step_3b",
+          "name": "Fetch KB",
+          "type": "tool",
+          "tool_name": "FetchKB",
+          "inputs": {
+            "query": "{{input.text}}"
+          },
+          "outputs": {
+            "matched": "{{kb.matched}}",
+            "top_snippets": "{{kb.top_snippets}}"
+          }
+        },
+        {
+          "step_id": "step_4b",
+          "name": "KB Decision",
+          "type": "decision",
+          "condition": "{{kb.matched}} == true && {{kb.top_snippets[0].confidence}} > 0.8",
+          "true_branch": "AutoReplyBranch",
+          "false_branch": "CreateTicketBranch"
+        },
+        {
+          "branch_id": "AutoReplyBranch",
+          "steps": [
+            {
+              "step_id": "step_5b",
+              "name": "Compose Auto Reply",
+              "type": "ai_skill",
+              "skill_name": "ResponseComposer",
+              "inputs": {
+                "template_id": "KB_RESPONSE_01",
+                "channel": "{{input.channel}}",
+                "custom_fields": {
+                  "kb_snippet": "{{kb.top_snippets[0].snippet}}"
+                },
+                "language": "en"
+              }
+            },
+            {
+              "step_id": "step_6b",
+              "name": "Send Reply",
+              "type": "tool",
+              "tool_name": "SendResponse",
+              "inputs": {
+                "channel": "{{input.channel}}",
+                "message": "{{response.message}}"
+              }
+            }
+          ]
+        },
+        {
+          "branch_id": "CreateTicketBranch",
+          "steps": [
+            {
+              "step_id": "step_7b",
+              "name": "Create P3 Ticket",
+              "type": "tool",
+              "tool_name": "CreateTicket",
+              "inputs": {
+                "customer": "{{input.metadata.customer}}",
+                "title": "{{input.text}}",
+                "text": "{{input.text}}",
+                "priority": "P3"
+              }
+            }
+          ]
+        },
+        {
+          "step_id": "step_8b",
+          "name": "Ingest Event",
+          "type": "tool",
+          "tool_name": "IngestEvent",
+          "inputs": {
+            "event_type": "ticket_created",
+            "data": {
+              "input": "{{input}}",
+              "kb_result": "{{kb}}"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "output": {
+    "status": "completed",
+    "crisis_detected": "{{crisis_detector.is_crisis}}",
+    "actions_taken": "{{triage.required_actions}}",
+    "event_id": "{{ingest_event.eventId}}"
+  }
+}
+

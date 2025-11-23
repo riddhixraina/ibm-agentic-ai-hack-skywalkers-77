@@ -1,0 +1,510 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "ResolveAI 360 Tools API",
+    "description": "API endpoints for ResolveAI 360 crisis management system tools",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://your-backend.com",
+      "description": "Production server (update with your backend URL)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      }
+    },
+    "schemas": {
+      "Customer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Customer ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Customer name"
+          },
+          "contact": {
+            "type": "string",
+            "description": "Customer contact email or phone"
+          }
+        },
+        "required": ["id"]
+      },
+      "CreateTicketRequest": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/Customer"
+          },
+          "title": {
+            "type": "string",
+            "description": "Ticket title/summary"
+          },
+          "text": {
+            "type": "string",
+            "description": "Full ticket description and details"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["P0", "P1", "P2", "P3", "P4"],
+            "description": "Ticket priority level. P0=critical, P1=high, P2=medium, P3=low, P4=informational"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of attachment URLs or file references"
+          }
+        },
+        "required": ["customer", "title", "text", "priority"]
+      },
+      "CreateTicketResponse": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "ticketUrl": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PostSocialRequest": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": ["twitter", "x", "facebook"],
+            "description": "Social media platform"
+          },
+          "message": {
+            "type": "string",
+            "description": "Message to post. Must be under 280 characters for Twitter/X."
+          },
+          "in_reply_to_id": {
+            "type": "string",
+            "description": "Optional: ID of the post/tweet this is replying to"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional: Array of media URLs to attach"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "If true, validate message but don't actually post. Use for testing."
+          }
+        },
+        "required": ["channel", "message"]
+      },
+      "PostSocialResponse": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NotifyOpsRequest": {
+        "type": "object",
+        "properties": {
+          "priority": {
+            "type": "string",
+            "enum": ["P0", "P1", "P2"],
+            "description": "Incident priority. P0=critical outage, P1=high impact, P2=medium impact"
+          },
+          "incident_id": {
+            "type": "string",
+            "description": "Unique incident identifier"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Brief summary of the incident"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of relevant URLs (status page, ticket links, dashboards)"
+          }
+        },
+        "required": ["priority", "incident_id", "summary"]
+      },
+      "NotifyOpsResponse": {
+        "type": "object",
+        "properties": {
+          "notified": {
+            "type": "boolean"
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "IngestEventRequest": {
+        "type": "object",
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "enum": ["crisis_detected", "ticket_created", "response_sent", "tool_called", "governance_check"],
+            "description": "Type of event being logged"
+          },
+          "data": {
+            "type": "object",
+            "description": "Event data payload (can contain any relevant fields)"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional metadata (model versions, timestamps, user info)"
+          }
+        },
+        "required": ["event_type", "data"]
+      },
+      "IngestEventResponse": {
+        "type": "object",
+        "properties": {
+          "stored": {
+            "type": "boolean"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/api/skills/create-ticket": {
+      "post": {
+        "summary": "Creates a support ticket in Zendesk or Salesforce",
+        "description": "Use this when a customer issue needs to be tracked and resolved by the support team.",
+        "operationId": "createTicket",
+        "tags": ["Tickets"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTicketRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ticket created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateTicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/skills/post-social": {
+      "post": {
+        "summary": "Posts a message to social media platforms",
+        "description": "Posts a message to social media platforms (Twitter/X, Facebook). Use this to respond to public complaints or announce service updates during crises.",
+        "operationId": "postSocial",
+        "tags": ["Social Media"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostSocialRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Post created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostSocialResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/skills/notify-ops": {
+      "post": {
+        "summary": "Sends notifications to operations teams",
+        "description": "Sends notifications to operations teams via Slack and PagerDuty. Use this to escalate critical incidents to on-call engineers.",
+        "operationId": "notifyOps",
+        "tags": ["Operations"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotifyOpsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notification sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotifyOpsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/skills/kb-search": {
+      "get": {
+        "summary": "Searches the knowledge base",
+        "description": "Searches the knowledge base for solutions, documentation, or known issues. Use this to find answers before responding to customers.",
+        "operationId": "fetchKB",
+        "tags": ["Knowledge Base"],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search query string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "matched": {
+                      "type": "boolean"
+                    },
+                    "top_snippets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "snippet": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "number"
+                          },
+                          "category": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "query": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/skills/ingest-event": {
+      "post": {
+        "summary": "Logs an event to the data lake",
+        "description": "Logs an event to the data lake for audit, analytics, and compliance. Use this to record all AI decisions, tool calls, and outcomes.",
+        "operationId": "ingestEvent",
+        "tags": ["Events"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestEventRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event logged successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestEventResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/skills/social-monitor": {
+      "get": {
+        "summary": "Monitors social media platforms",
+        "description": "Monitors social media platforms for mentions, hashtags, or trending topics related to the company. Use this to detect emerging crises.",
+        "operationId": "socialMonitor",
+        "tags": ["Social Media"],
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["twitter", "x", "facebook", "all"]
+            },
+            "description": "Platform to monitor"
+          },
+          {
+            "name": "keywords",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Keywords or hashtags to search for",
+            "style": "form",
+            "explode": true
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "ISO timestamp for time range start (e.g., '2025-01-20T10:00:00Z')"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monitoring results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "posts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "platform": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}
+

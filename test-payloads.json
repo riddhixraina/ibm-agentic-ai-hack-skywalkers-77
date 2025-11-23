@@ -1,0 +1,129 @@
+{
+  "test_cases": [
+    {
+      "name": "High Severity - Outage Crisis (Twitter)",
+      "description": "Simulates a widespread outage reported on social media",
+      "payload": {
+        "text": "Is IBM cloud down? can't access my bucket since 10:05. many people complaining #ibmclouddown",
+        "channel": "twitter",
+        "metadata": {
+          "retweets": 120,
+          "mentions": ["#ibmclouddown"],
+          "timestamp": "2025-11-20T10:08:00Z",
+          "author": "@user123"
+        }
+      },
+      "expected_behavior": {
+        "crisis_detected": true,
+        "crisis_score": ">= 0.7",
+        "priority": "P1",
+        "actions": ["create_ticket", "post_social", "notify_ops"]
+      }
+    },
+    {
+      "name": "Low Severity - Single Billing Complaint (Chat)",
+      "description": "Simulates a single customer billing issue",
+      "payload": {
+        "text": "I was charged twice for November invoice, please refund",
+        "channel": "chat",
+        "metadata": {
+          "customer_tier": "standard",
+          "customer_id": "CUST-12345",
+          "timestamp": "2025-11-20T11:00:00Z"
+        }
+      },
+      "expected_behavior": {
+        "crisis_detected": false,
+        "crisis_score": "< 0.4",
+        "priority": "P3",
+        "actions": ["create_ticket"]
+      }
+    },
+    {
+      "name": "High Severity - PR Crisis (Twitter)",
+      "description": "Simulates a public relations crisis with high engagement",
+      "payload": {
+        "text": "Company tweeted wrong numbers and customers are upset; many retweets",
+        "channel": "twitter",
+        "metadata": {
+          "retweets": 450,
+          "engagement": "high",
+          "timestamp": "2025-11-20T12:00:00Z",
+          "author": "@news_account"
+        }
+      },
+      "expected_behavior": {
+        "crisis_detected": true,
+        "crisis_type": "PR",
+        "priority": "P1",
+        "actions": ["notify_pr", "post_social", "create_ticket"]
+      }
+    },
+    {
+      "name": "Medium Severity - Service Degradation (Email)",
+      "description": "Simulates multiple reports of slow performance",
+      "payload": {
+        "text": "Service is very slow today, taking 30+ seconds to load pages. Several team members reporting same issue.",
+        "channel": "email",
+        "metadata": {
+          "customer_tier": "enterprise",
+          "customer_id": "CUST-67890",
+          "timestamp": "2025-11-20T13:00:00Z",
+          "related_tickets": 5
+        }
+      },
+      "expected_behavior": {
+        "crisis_detected": true,
+        "crisis_score": "0.5-0.7",
+        "priority": "P2",
+        "actions": ["create_ticket", "notify_ops"]
+      }
+    },
+    {
+      "name": "Distressed Customer (Chat)",
+      "description": "Simulates a customer in emotional distress",
+      "payload": {
+        "text": "I'm so frustrated and scared. My business depends on this service and it's been down for hours. I don't know what to do.",
+        "channel": "chat",
+        "metadata": {
+          "customer_tier": "enterprise",
+          "customer_id": "CUST-11111",
+          "timestamp": "2025-11-20T14:00:00Z"
+        }
+      },
+      "expected_behavior": {
+        "crisis_detected": false,
+        "distress_flag": true,
+        "sentiment": "negative",
+        "priority": "P1",
+        "actions": ["create_ticket", "notify_ops"],
+        "requires_human_escalation": true
+      }
+    },
+    {
+      "name": "KB Match - Common Issue (Chat)",
+      "description": "Simulates a question that should match knowledge base",
+      "payload": {
+        "text": "How do I clear cache if I see 500 errors?",
+        "channel": "chat",
+        "metadata": {
+          "customer_tier": "standard",
+          "customer_id": "CUST-22222",
+          "timestamp": "2025-11-20T15:00:00Z"
+        }
+      },
+      "expected_behavior": {
+        "crisis_detected": false,
+        "kb_matched": true,
+        "auto_reply": true,
+        "priority": null
+      }
+    }
+  ],
+  "usage": {
+    "description": "Use these test payloads to validate your Orchestrate flows",
+    "endpoint": "POST /api/trigger-flow",
+    "example_curl": "curl -X POST http://localhost:5000/api/trigger-flow -H 'Content-Type: application/json' -d @test-payloads.json"
+  }
+}
+

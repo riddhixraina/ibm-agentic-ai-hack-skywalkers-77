@@ -1,0 +1,199 @@
+{
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "create_ticket",
+        "description": "Creates a support ticket in Zendesk or Salesforce. Use this when a customer issue needs to be tracked and resolved by the support team.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "customer": {
+              "type": "object",
+              "description": "Customer information",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Customer ID"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Customer name"
+                },
+                "contact": {
+                  "type": "string",
+                  "description": "Customer contact email or phone"
+                }
+              },
+              "required": ["id"]
+            },
+            "title": {
+              "type": "string",
+              "description": "Ticket title/summary"
+            },
+            "text": {
+              "type": "string",
+              "description": "Full ticket description and details"
+            },
+            "priority": {
+              "type": "string",
+              "enum": ["P0", "P1", "P2", "P3", "P4"],
+              "description": "Ticket priority level. P0=critical, P1=high, P2=medium, P3=low, P4=informational"
+            },
+            "attachments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Array of attachment URLs or file references"
+            }
+          },
+          "required": ["customer", "title", "text", "priority"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "post_social",
+        "description": "Posts a message to social media platforms (Twitter/X, Facebook). Use this to respond to public complaints or announce service updates during crises.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "channel": {
+              "type": "string",
+              "enum": ["twitter", "x", "facebook"],
+              "description": "Social media platform"
+            },
+            "message": {
+              "type": "string",
+              "description": "Message to post. Must be under 280 characters for Twitter/X."
+            },
+            "in_reply_to_id": {
+              "type": "string",
+              "description": "Optional: ID of the post/tweet this is replying to"
+            },
+            "attachments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional: Array of media URLs to attach"
+            },
+            "dry_run": {
+              "type": "boolean",
+              "description": "If true, validate message but don't actually post. Use for testing."
+            }
+          },
+          "required": ["channel", "message"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "notify_ops",
+        "description": "Sends notifications to operations teams via Slack and PagerDuty. Use this to escalate critical incidents to on-call engineers.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "priority": {
+              "type": "string",
+              "enum": ["P0", "P1", "P2"],
+              "description": "Incident priority. P0=critical outage, P1=high impact, P2=medium impact"
+            },
+            "incident_id": {
+              "type": "string",
+              "description": "Unique incident identifier"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Brief summary of the incident"
+            },
+            "links": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Array of relevant URLs (status page, ticket links, dashboards)"
+            }
+          },
+          "required": ["priority", "incident_id", "summary"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "fetch_kb",
+        "description": "Searches the knowledge base for solutions, documentation, or known issues. Use this to find answers before responding to customers.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query string"
+            }
+          },
+          "required": ["query"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "ingest_event",
+        "description": "Logs an event to the data lake for audit, analytics, and compliance. Use this to record all AI decisions, tool calls, and outcomes.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "event_type": {
+              "type": "string",
+              "enum": ["crisis_detected", "ticket_created", "response_sent", "tool_called", "governance_check"],
+              "description": "Type of event being logged"
+            },
+            "data": {
+              "type": "object",
+              "description": "Event data payload (can contain any relevant fields)"
+            },
+            "metadata": {
+              "type": "object",
+              "description": "Additional metadata (model versions, timestamps, user info)"
+            }
+          },
+          "required": ["event_type", "data"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "social_monitor",
+        "description": "Monitors social media platforms for mentions, hashtags, or trending topics related to the company. Use this to detect emerging crises.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "type": "string",
+              "enum": ["twitter", "x", "facebook", "all"],
+              "description": "Platform to monitor"
+            },
+            "keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Keywords or hashtags to search for"
+            },
+            "since": {
+              "type": "string",
+              "description": "ISO timestamp for time range start (e.g., '2025-01-20T10:00:00Z')"
+            }
+          },
+          "required": ["keywords"]
+        }
+      }
+    }
+  ]
+}
+

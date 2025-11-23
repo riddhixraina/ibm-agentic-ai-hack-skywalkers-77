@@ -1,0 +1,114 @@
+{
+  "flow_name": "SocialScanScheduler",
+  "description": "Periodic flow that monitors social media for emerging crises",
+  "trigger": {
+    "type": "cron",
+    "schedule": "*/5 * * * *",
+    "description": "Runs every 5 minutes"
+  },
+  "steps": [
+    {
+      "step_id": "step_1",
+      "name": "Monitor Social Media",
+      "type": "tool",
+      "tool_name": "SocialMediaMonitor",
+      "inputs": {
+        "platform": "all",
+        "keywords": [
+          "#ibmclouddown",
+          "ibm cloud down",
+          "ibm outage",
+          "@ibmcloud"
+        ],
+        "since": "{{last_scan_timestamp}}"
+      },
+      "outputs": {
+        "posts": "{{social_posts.posts}}",
+        "count": "{{social_posts.count}}"
+      }
+    },
+    {
+      "step_id": "step_2",
+      "name": "Process Each Post",
+      "type": "loop",
+      "iterate_over": "{{social_posts.posts}}",
+      "steps": [
+        {
+          "step_id": "step_2_1",
+          "name": "Run CrisisDetector on Post",
+          "type": "ai_skill",
+          "skill_name": "CrisisDetector",
+          "inputs": {
+            "text": "{{current_post.text}}",
+            "channel": "{{current_post.platform}}",
+            "metadata": {
+              "retweets": "{{current_post.retweets}}",
+              "mentions": "{{current_post.mentions}}",
+              "timestamp": "{{current_post.timestamp}}"
+            }
+          },
+          "outputs": {
+            "is_crisis": "{{post_crisis.is_crisis}}",
+            "crisis_score": "{{post_crisis.crisis_score}}"
+          }
+        },
+        {
+          "step_id": "step_2_2",
+          "name": "Check if Crisis",
+          "type": "decision",
+          "condition": "{{post_crisis.is_crisis}} == true && {{post_crisis.crisis_score}} >= 0.7",
+          "true_branch": "TriggerCrisisFlow",
+          "false_branch": "Continue"
+        },
+        {
+          "branch_id": "TriggerCrisisFlow",
+          "steps": [
+            {
+              "step_id": "step_2_3",
+              "name": "Trigger RealTimeCrisisFlow",
+              "type": "flow_call",
+              "flow_name": "RealTimeCrisisFlow",
+              "inputs": {
+                "text": "{{current_post.text}}",
+                "channel": "{{current_post.platform}}",
+                "metadata": {
+                  "retweets": "{{current_post.retweets}}",
+                  "mentions": "{{current_post.mentions}}",
+                  "timestamp": "{{current_post.timestamp}}",
+                  "post_id": "{{current_post.id}}"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "step_id": "step_3",
+      "name": "Update Last Scan Timestamp",
+      "type": "set_variable",
+      "variable": "last_scan_timestamp",
+      "value": "{{current_timestamp}}"
+    },
+    {
+      "step_id": "step_4",
+      "name": "Log Scan Results",
+      "type": "tool",
+      "tool_name": "IngestEvent",
+      "inputs": {
+        "event_type": "social_scan",
+        "data": {
+          "posts_found": "{{social_posts.count}}",
+          "crises_detected": "{{count_crises}}",
+          "timestamp": "{{current_timestamp}}"
+        }
+      }
+    }
+  ],
+  "output": {
+    "status": "completed",
+    "posts_scanned": "{{social_posts.count}}",
+    "crises_detected": "{{count_crises}}"
+  }
+}
+

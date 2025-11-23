@@ -1,0 +1,128 @@
+{
+  "flow_name": "HumanReviewFlow",
+  "description": "Flow that handles human review requests when GovernanceAuditor flags content",
+  "trigger": {
+    "type": "webhook",
+    "method": "POST",
+    "endpoint": "/api/human-review"
+  },
+  "steps": [
+    {
+      "step_id": "step_1",
+      "name": "Create Review Card",
+      "type": "tool",
+      "tool_name": "NotifyOps",
+      "inputs": {
+        "priority": "P1",
+        "incident_id": "{{input.flow_run_id}}",
+        "summary": "Human review required for automated response",
+        "links": [
+          "{{input.review_url}}"
+        ]
+      }
+    },
+    {
+      "step_id": "step_2",
+      "name": "Create Review Ticket",
+      "type": "tool",
+      "tool_name": "CreateTicket",
+      "inputs": {
+        "customer": {
+          "id": "internal",
+          "name": "AI Governance Review"
+        },
+        "title": "Review Required: {{input.reason}}",
+        "text": "{{input.review_context}}",
+        "priority": "P1"
+      },
+      "outputs": {
+        "ticket_id": "{{review_ticket.ticketId}}",
+        "ticket_url": "{{review_ticket.ticketUrl}}"
+      }
+    },
+    {
+      "step_id": "step_3",
+      "name": "Wait for Human Decision",
+      "type": "wait",
+      "event": "human_approval",
+      "timeout": 3600,
+      "inputs": {
+        "flow_run_id": "{{input.flow_run_id}}"
+      }
+    },
+    {
+      "step_id": "step_4",
+      "name": "Process Decision",
+      "type": "decision",
+      "condition": "{{human_approval.decision}}",
+      "branches": {
+        "approve": "ApprovedBranch",
+        "reject": "RejectedBranch"
+      }
+    },
+    {
+      "branch_id": "ApprovedBranch",
+      "steps": [
+        {
+          "step_id": "step_5a",
+          "name": "Resume Original Flow",
+          "type": "flow_resume",
+          "flow_run_id": "{{input.flow_run_id}}",
+          "decision": "approve"
+        },
+        {
+          "step_id": "step_6a",
+          "name": "Log Approval",
+          "type": "tool",
+          "tool_name": "IngestEvent",
+          "inputs": {
+            "event_type": "human_approval",
+            "data": {
+              "decision": "approve",
+              "flow_run_id": "{{input.flow_run_id}}",
+              "comments": "{{human_approval.comments}}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "branch_id": "RejectedBranch",
+      "steps": [
+        {
+          "step_id": "step_5b",
+          "name": "Log Rejection",
+          "type": "tool",
+          "tool_name": "IngestEvent",
+          "inputs": {
+            "event_type": "human_approval",
+            "data": {
+              "decision": "reject",
+              "flow_run_id": "{{input.flow_run_id}}",
+              "comments": "{{human_approval.comments}}"
+            }
+          }
+        },
+        {
+          "step_id": "step_6b",
+          "name": "Create Internal Incident",
+          "type": "tool",
+          "tool_name": "CreateTicket",
+          "inputs": {
+            "customer": {
+              "id": "internal"
+            },
+            "title": "Rejected AI Response - Manual Review Required",
+            "text": "{{input.review_context}}\n\nRejection reason: {{human_approval.comments}}",
+            "priority": "P0"
+          }
+        }
+      ]
+    }
+  ],
+  "output": {
+    "status": "{{human_approval.decision}}",
+    "ticket_id": "{{review_ticket.ticketId}}"
+  }
+}
+
