@@ -9,19 +9,31 @@ export function useSocket() {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
-    const newSocket = io(BACKEND_URL, {
-      transports: ['websocket', 'polling']
-    });
+    let newSocket = null;
+    
+    try {
+      newSocket = io(BACKEND_URL, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 3,
+        reconnectionDelay: 1000,
+        timeout: 5000
+      });
 
-    newSocket.on('connect', () => {
-      console.log('Connected to backend');
-      setConnected(true);
-    });
+      newSocket.on('connect', () => {
+        console.log('Connected to backend via Socket.io');
+        setConnected(true);
+      });
 
-    newSocket.on('disconnect', () => {
-      console.log('Disconnected from backend');
-      setConnected(false);
-    });
+      newSocket.on('disconnect', () => {
+        console.log('Disconnected from backend');
+        setConnected(false);
+      });
+
+      newSocket.on('connect_error', (error) => {
+        console.warn('Socket.io connection failed (using polling fallback):', error.message);
+        setConnected(false);
+      });
 
     // Listen for flow updates
     newSocket.on('flowUpdate', (data) => {
@@ -63,10 +75,16 @@ export function useSocket() {
       }, ...prev]);
     });
 
-    setSocket(newSocket);
+      setSocket(newSocket);
+    } catch (error) {
+      console.warn('Socket.io not available (serverless environment):', error.message);
+      setConnected(false);
+    }
 
     return () => {
-      newSocket.close();
+      if (newSocket) {
+        newSocket.close();
+      }
     };
   }, []);
 

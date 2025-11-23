@@ -14,12 +14,28 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
+
+// Socket.io - optional (won't work on Vercel, but won't break the app)
+let io = null;
+try {
+  io = new Server(server, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
+} catch (error) {
+  console.warn('Socket.io initialization failed (this is OK on Vercel):', error.message);
+}
+
+// Helper function to safely emit Socket.io events
+function emitSocketEvent(event, data) {
+  if (io) {
+    io.emit(event, data);
   }
-});
+  // If Socket.io not available, events are still logged
+  console.log(`[Event] ${event}:`, data);
+}
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -135,7 +151,7 @@ app.post('/api/skills/notify-ops', requireApiKey, async (req, res) => {
   try {
     // TODO: Call Slack, PagerDuty adapters here
     // For demo: emit socket event
-    io.emit('opsNotification', { 
+    emitSocketEvent('opsNotification', { 
       priority, 
       incident_id, 
       summary, 
@@ -216,7 +232,7 @@ app.post('/api/skills/ingest-event', requireApiKey, async (req, res) => {
     const eventId = 'EVT-' + crypto.randomBytes(4).toString('hex');
     
     // Push to dashboard via socket
-    io.emit('newEvent', { eventId, event, timestamp: new Date().toISOString() });
+    emitSocketEvent('newEvent', { eventId, event, timestamp: new Date().toISOString() });
     
     console.log(`[IngestEvent] Stored event: ${eventId}`);
     
@@ -260,7 +276,7 @@ app.get('/api/skills/social-monitor', requireApiKey, async (req, res) => {
 // === Orchestrate callback endpoint ===
 app.post('/api/orchestrate/callback', async (req, res) => {
   // Orchestrate will post step updates here; broadcast to UI
-  io.emit('flowUpdate', { ...req.body, timestamp: new Date().toISOString() });
+  emitSocketEvent('flowUpdate', { ...req.body, timestamp: new Date().toISOString() });
   console.log('[Orchestrate Callback]', req.body);
   res.status(200).send('ok');
 });
@@ -352,7 +368,7 @@ app.post('/api/skills/human-approval', requireApiKey, async (req, res) => {
   try {
     // TODO: Use Orchestrate REST API to resume flow if needed
     // For demo: emit event
-    io.emit('humanApproval', { 
+    emitSocketEvent('humanApproval', { 
       flow_run_id, 
       decision, 
       comments,
@@ -377,19 +393,35 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Socket.io connection handler
-io.on('connection', (socket) => {
-  console.log('UI connected:', socket.id);
-  
-  socket.on('disconnect', () => {
-    console.log('UI disconnected:', socket.id);
+// Socket.io connection handler (only if Socket.io is available)
+if (io) {
+  io.on('connection', (socket) => {
+    console.log('UI connected:', socket.id);
+    
+    socket.on('disconnect', () => {
+      console.log('UI disconnected:', socket.id);
+    });
   });
-});
+} else {
+  console.log('Socket.io not available (serverless environment) - REST API only');
+}
 
-const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => {
-  console.log(`🚀 ResolveAI 360 Server listening on port ${PORT}`);
-  console.log(`📡 Socket.IO ready for real-time updates`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-});
+// Export for Vercel serverless
+export default app;
+
+// Only start HTTP server if not in serverless environment (Vercel)
+if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
+  const PORT = process.env.PORT || 8080;
+  server.listen(PORT, () => {
+    console.log(`🚀 ResolveAI 360 Server listening on port ${PORT}`);
+    if (io) {
+      console.log(`📡 Socket.IO ready for real-time updates`);
+    } else {
+      console.log(`📡 REST API mode (Socket.IO not available)`);
+    }
+    console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+  });
+} else {
+  console.log('Running in serverless mode (Vercel) - REST API only');
+}
 

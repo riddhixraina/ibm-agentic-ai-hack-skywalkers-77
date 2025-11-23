@@ -21,13 +21,29 @@ export default function Dashboard() {
       .catch(err => console.error('Health check failed:', err));
 
     // Fetch recent executions
-    executionsAPI.getAll({ limit: 10 })
-      .then(res => {
-        if (res.data?.executions) {
-          setRecentExecutions(res.data.executions);
-        }
-      })
-      .catch(err => console.error('Failed to fetch executions:', err));
+    const loadExecutions = () => {
+      executionsAPI.getAll({ limit: 10 })
+        .then(res => {
+          if (res.data?.executions) {
+            setRecentExecutions(res.data.executions);
+          } else if (res.data) {
+            // Handle different response formats
+            setRecentExecutions(Array.isArray(res.data) ? res.data : []);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to fetch executions:', err);
+          // Don't show error to user, just log it
+        });
+    };
+
+    loadExecutions();
+    
+    // Poll for updates if Socket.io not connected (fallback for serverless)
+    if (!connected) {
+      const interval = setInterval(loadExecutions, 5000); // Poll every 5 seconds
+      return () => clearInterval(interval);
+    }
 
     // Calculate stats from events
     const crises = events.filter(e => e.type === 'flowUpdate' && e.data?.crisis_detected);
@@ -39,7 +55,7 @@ export default function Dashboard() {
       ticketsCreated: tickets.length,
       avgResponseTime: 2.3 // Mock data
     });
-  }, [events]);
+  }, [events, connected]);
 
   const statCards = [
     { label: 'Crises Detected', value: stats.totalCrises, icon: '🚨', color: 'bg-red-500' },
