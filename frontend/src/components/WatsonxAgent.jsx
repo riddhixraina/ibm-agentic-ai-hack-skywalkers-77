@@ -357,7 +357,7 @@ export default function WatsonxAgent() {
       
       // Create final response
       const execId = `exec-${Date.now()}`;
-      const ticketInfo = toolsCalled.find(t => t.name === 'CreateTicket')?.result?.ticketId || 'TICK-' + Date.now().toString().slice(-6);
+      // ticketInfo already declared above in Step 4
       
       const mockResponse = {
         id: `resp-${Date.now()}`,
