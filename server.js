@@ -253,31 +253,116 @@ app.get('/api/skills/kb-search', requireApiKey, async (req, res) => {
   const q = req.query.q || '';
   
   try {
-    // TODO: Replace with real KB search (watsonx Discovery, Elasticsearch, etc.)
-    // Simple in-memory KB search for demo
+    // Dummy knowledge base data for demo
     const kbData = [
+      // Outage/Service Issues
       { 
-        id: 'KB1', 
-        snippet: 'If you see 500 errors, try clearing cache and refreshing the page', 
-        confidence: 0.6,
-        category: 'troubleshooting'
-      },
-      {
-        id: 'KB2',
-        snippet: 'Storage bucket access issues: Check IAM permissions and bucket policy',
-        confidence: 0.8,
-        category: 'storage'
-      },
-      {
-        id: 'KB3',
-        snippet: 'Billing refunds are processed within 3-5 business days',
+        id: 'KB-OUTAGE-001', 
+        snippet: 'If you experience service outages or cannot access your storage buckets, check the status page at status.ibm.com. Common causes include scheduled maintenance or regional issues. Estimated resolution time is typically 15-30 minutes.', 
         confidence: 0.9,
-        category: 'billing'
+        category: 'outage',
+        keywords: ['outage', 'down', 'unavailable', 'access', 'bucket', 'storage', 'service']
       },
       {
-        id: 'KB4',
-        snippet: 'Service outages are posted on status.example.com',
+        id: 'KB-OUTAGE-002',
+        snippet: 'For cloud service disruptions, our engineering team is automatically notified. You can check real-time status updates on our status page. If the issue persists beyond 30 minutes, contact support.',
+        confidence: 0.85,
+        category: 'outage',
+        keywords: ['cloud', 'disruption', 'status', 'engineering', 'support']
+      },
+      // Billing Issues
+      {
+        id: 'KB-BILLING-001',
+        snippet: 'For billing questions or duplicate charges, visit the billing portal to view your invoices. Refunds are processed within 3-5 business days. Contact billing support for immediate assistance.',
+        confidence: 0.8,
+        category: 'billing',
+        keywords: ['billing', 'charge', 'invoice', 'refund', 'payment', 'duplicate']
+      },
+      {
+        id: 'KB-BILLING-002',
+        snippet: 'If you were charged incorrectly, we can process a refund. Please provide your invoice number and the amount in question. Standard refund processing time is 3-5 business days.',
+        confidence: 0.75,
+        category: 'billing',
+        keywords: ['refund', 'incorrect', 'charge', 'invoice', 'amount']
+      },
+      // Troubleshooting
+      { 
+        id: 'KB-TROUBLESHOOT-001', 
+        snippet: 'If you see 500 errors, try clearing your browser cache, refreshing the page, or waiting a few minutes and retrying. If the issue persists, check our status page for known issues.', 
         confidence: 0.7,
+        category: 'troubleshooting',
+        keywords: ['500', 'error', 'cache', 'refresh', 'retry']
+      },
+      {
+        id: 'KB-TROUBLESHOOT-002',
+        snippet: 'For VM or instance crashes, check your resource limits and configuration. Review the logs in your dashboard. Common causes include insufficient memory or configuration errors.',
+        confidence: 0.65,
+        category: 'troubleshooting',
+        keywords: ['vm', 'crash', 'instance', 'memory', 'config', 'logs']
+      },
+      // Security Issues
+      {
+        id: 'KB-SECURITY-001',
+        snippet: 'If you suspect a security issue or unauthorized access, immediately change your password and enable two-factor authentication. Contact security support for account lockout or breach concerns.',
+        confidence: 0.9,
+        category: 'security',
+        keywords: ['security', 'unauthorized', 'breach', 'password', '2fa', 'lockout']
+      },
+      // PR/Communication
+      {
+        id: 'KB-PR-001',
+        snippet: 'For public relations inquiries or social media concerns, our PR team handles all external communications. Escalate to PR team for brand reputation issues or public statements.',
+        confidence: 0.8,
+        category: 'pr',
+        keywords: ['pr', 'public', 'social', 'media', 'reputation', 'statement']
+      },
+      // General Support
+      {
+        id: 'KB-SUPPORT-001',
+        snippet: 'For general support questions, check our documentation portal or submit a support ticket. Response time varies by priority: P1 (5 minutes), P2 (1 hour), P3 (24 hours).',
+        confidence: 0.6,
+        category: 'support',
+        keywords: ['support', 'help', 'ticket', 'documentation', 'question']
+      },
+      // Crisis Response
+      {
+        id: 'KB-CRISIS-001',
+        snippet: 'During a crisis, our automated system detects issues and escalates to operations within 2 minutes. P1 incidents trigger immediate ops notification, social media response, and ticket creation.',
+        confidence: 0.95,
+        category: 'crisis',
+        keywords: ['crisis', 'incident', 'escalate', 'ops', 'p1', 'emergency']
+      }
+    ];
+    
+    // Enhanced keyword matching
+    const queryLower = q.toLowerCase();
+    const matched = kbData
+      .map(item => {
+        // Check snippet match
+        const snippetMatch = item.snippet.toLowerCase().includes(queryLower);
+        // Check category match
+        const categoryMatch = item.category.toLowerCase().includes(queryLower);
+        // Check keyword match
+        const keywordMatch = item.keywords.some(keyword => 
+          keyword.toLowerCase().includes(queryLower) || 
+          queryLower.includes(keyword.toLowerCase())
+        );
+        
+        // Calculate relevance score
+        let score = item.confidence;
+        if (snippetMatch) score += 0.2;
+        if (categoryMatch) score += 0.15;
+        if (keywordMatch) score += 0.1;
+        
+        return {
+          ...item,
+          relevanceScore: score,
+          matched: snippetMatch || categoryMatch || keywordMatch
+        };
+      })
+      .filter(item => item.matched)
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, 5); // Top 5 results
         category: 'status'
       }
     ];
