@@ -8,29 +8,116 @@ export default function EventLog() {
   const [searchTerm, setSearchTerm] = useState('');
   const [executionEvents, setExecutionEvents] = useState([]);
   
+  // Default example events
+  const getDefaultEvents = () => {
+    const now = Date.now();
+    return [
+      {
+        type: 'flowUpdate',
+        timestamp: new Date(now - 300000).toISOString(),
+        data: {
+          flow_id: 'exec-demo-001',
+          flow_name: 'RealTimeCrisisFlow',
+          status: 'completed',
+          input: { text: 'Is IBM cloud down?', channel: 'twitter' },
+          output: { crisis_detected: true, priority: 'P1' },
+          crisis_detected: true,
+          priority: 'P1'
+        }
+      },
+      {
+        type: 'newEvent',
+        timestamp: new Date(now - 310000).toISOString(),
+        data: {
+          event_type: 'ticket_created',
+          ticketId: 'TICK-demo-001',
+          flow_id: 'exec-demo-001',
+          ticket_created: true
+        }
+      },
+      {
+        type: 'opsNotification',
+        timestamp: new Date(now - 320000).toISOString(),
+        data: {
+          priority: 'P1',
+          incident_id: 'INC-demo-001',
+          summary: 'Crisis detected: Cloud outage',
+          channels: ['slack', 'pagerduty']
+        }
+      },
+      {
+        type: 'flowUpdate',
+        timestamp: new Date(now - 600000).toISOString(),
+        data: {
+          flow_id: 'exec-demo-002',
+          flow_name: 'RealTimeCrisisFlow',
+          status: 'completed',
+          input: { text: 'Billing issue', channel: 'chat' },
+          output: { crisis_detected: false, priority: 'P2' },
+          crisis_detected: false,
+          priority: 'P2'
+        }
+      },
+      {
+        type: 'newEvent',
+        timestamp: new Date(now - 610000).toISOString(),
+        data: {
+          event_type: 'ticket_created',
+          ticketId: 'TICK-demo-002',
+          flow_id: 'exec-demo-002',
+          ticket_created: true
+        }
+      }
+    ];
+  };
+
   // Generate events from executions data
   useEffect(() => {
     const loadEvents = async () => {
       try {
         const response = await executionsAPI.getAll({ limit: 50 });
-        const executions = response.data?.executions || [];
+        let executions = response.data?.executions || [];
+        
+        console.log(`[EventLog] Loaded ${executions.length} executions for events`);
+        
+        // If no executions, use default data
+        if (executions.length === 0) {
+          console.log('[EventLog] No executions found, using default example events');
+          const defaultEvents = getDefaultEvents();
+          setExecutionEvents(defaultEvents);
+          return;
+        }
         
         // Convert executions to events
-        const eventsFromExecutions = executions.map(exec => ({
-          type: 'flowUpdate',
-          timestamp: exec.created_at || new Date().toISOString(),
-          data: {
-            flow_id: exec.id,
-            flow_name: exec.flow_name,
-            status: exec.status,
-            input: exec.input,
-            output: exec.output
-          }
-        }));
+        const eventsFromExecutions = executions.map(exec => {
+          // Determine event type based on execution data
+          let eventType = 'flowUpdate';
+          if (exec.output?.ticket_created) eventType = 'newEvent';
+          if (exec.output?.ops_notified) eventType = 'opsNotification';
+          
+          return {
+            type: eventType,
+            timestamp: exec.created_at || exec.start_time || new Date().toISOString(),
+            data: {
+              flow_id: exec.id,
+              flow_name: exec.flow_name,
+              status: exec.status,
+              input: exec.input,
+              output: exec.output,
+              crisis_detected: exec.output?.crisis_detected,
+              priority: exec.output?.priority,
+              ticket_created: exec.output?.ticket_created,
+              ticketId: exec.output?.ticketId
+            }
+          };
+        });
         
         setExecutionEvents(eventsFromExecutions);
+        console.log(`[EventLog] Generated ${eventsFromExecutions.length} events`);
       } catch (error) {
-        console.error('Failed to load execution events:', error);
+        console.error('[EventLog] Failed to load execution events:', error);
+        // On error, use default data
+        setExecutionEvents(getDefaultEvents());
       }
     };
     

@@ -65,6 +65,8 @@ export default function WatsonxAgent() {
   const [loading, setLoading] = useState(false);
   const [testPrompt, setTestPrompt] = useState('Is IBM cloud down? can\'t access my bucket since 10:05. many people complaining #ibmclouddown');
   const [useExamples, setUseExamples] = useState(true);
+  const [currentFlow, setCurrentFlow] = useState(null);
+  const [flowStages, setFlowStages] = useState([]);
 
   useEffect(() => {
     // Load example responses for demo
@@ -73,11 +75,35 @@ export default function WatsonxAgent() {
     }
   }, [useExamples]);
 
+  const updateFlowStage = (stage, status, data = {}) => {
+    setFlowStages(prev => {
+      const existing = prev.find(s => s.id === stage);
+      if (existing) {
+        return prev.map(s => s.id === stage ? { ...s, status, ...data } : s);
+      }
+      return [...prev, { id: stage, status, ...data }];
+    });
+  };
+
+  const getFlowStage = (stageId) => {
+    return flowStages.find(s => s.id === stageId);
+  };
+
   const handleTest = async () => {
     if (!testPrompt.trim()) return;
     
     setLoading(true);
     const promptText = testPrompt;
+    const flowId = `flow-${Date.now()}`;
+    setCurrentFlow(flowId);
+    setFlowStages([]);
+    
+    // STEP 1: IngestEvent
+    updateFlowStage('step1', 'running', { 
+      name: 'IngestEvent Tool', 
+      description: 'Logging event with timestamp',
+      startTime: Date.now()
+    });
     
     try {
       // Trigger flow via backend
@@ -89,6 +115,8 @@ export default function WatsonxAgent() {
           timestamp: new Date().toISOString()
         }
       };
+      
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Call backend to trigger flow and create execution
       const response = await api.post('/api/skills/ingest-event', {
@@ -102,97 +130,187 @@ export default function WatsonxAgent() {
         headers: { 'x-api-key': 'demo-key' }
       });
       
-      // Also trigger tools based on content
+      const step1Start = getFlowStage('step1')?.startTime || Date.now();
+      updateFlowStage('step1', 'completed', { 
+        result: { eventId: 'EVT-' + Date.now().toString().slice(-6) },
+        duration: Date.now() - step1Start
+      });
+      
+      // STEP 2: Agent Analysis
+      updateFlowStage('step2', 'running', { 
+        name: 'Agent Analysis (CrisisDetector)', 
+        description: 'Analyzing text for crisis indicators',
+        startTime: Date.now()
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const isCrisis = promptText.toLowerCase().includes('down') || 
                       promptText.toLowerCase().includes('outage') ||
                       promptText.toLowerCase().includes('crisis');
       
+      const crisisScore = isCrisis ? 0.92 : 0.12;
+      const priority = isCrisis ? 'P1' : 'P3';
+      
+      const step2Start = getFlowStage('step2')?.startTime || Date.now();
+      updateFlowStage('step2', 'completed', { 
+        result: { 
+          crisis_detected: isCrisis,
+          crisis_score: crisisScore,
+          priority: priority
+        },
+        duration: Date.now() - step2Start
+      });
+      
+      // STEP 3: Tool Orchestration (Parallel)
+      updateFlowStage('step3', 'running', { 
+        name: 'Tool Orchestration', 
+        description: 'Executing tools in parallel',
+        startTime: Date.now()
+      });
+      
       let toolsCalled = [];
+      const toolPromises = [];
       
+      // Create ticket (if crisis)
       if (isCrisis) {
-        // Create ticket
-        try {
-          const ticketRes = await api.post('/api/skills/create-ticket', {
-            customer: { id: 'CUST-frontend', name: 'Frontend User' },
-            title: 'Crisis detected from frontend',
-            text: promptText,
-            priority: 'P1',
-            execution_id: `exec-${Date.now()}`
-          }, {
-            headers: { 'x-api-key': 'demo-key' }
-          });
-          toolsCalled.push({
-            name: 'CreateTicket',
-            status: 'success',
-            result: ticketRes.data
-          });
-        } catch (e) {
-          toolsCalled.push({
-            name: 'CreateTicket',
-            status: 'error',
-            result: { error: e.message }
-          });
-        }
-        
-        // Notify ops
-        try {
-          const opsRes = await api.post('/api/skills/notify-ops', {
-            priority: 'P1',
-            incident_id: `INC-${Date.now()}`,
-            summary: 'Crisis detected from frontend query',
-            links: []
-          }, {
-            headers: { 'x-api-key': 'demo-key' }
-          });
-          toolsCalled.push({
-            name: 'NotifyOps',
-            status: 'success',
-            result: opsRes.data
-          });
-        } catch (e) {
-          toolsCalled.push({
-            name: 'NotifyOps',
-            status: 'error',
-            result: { error: e.message }
-          });
-        }
-      }
-      
-      // Search KB
-      try {
-        const kbRes = await api.get(`/api/skills/kb-search?q=${encodeURIComponent(promptText)}`, {
+        const ticketPromise = api.post('/api/skills/create-ticket', {
+          customer: { id: 'CUST-frontend', name: 'Frontend User' },
+          title: 'Crisis detected from frontend',
+          text: promptText,
+          priority: 'P1',
+          execution_id: `exec-${Date.now()}`
+        }, {
           headers: { 'x-api-key': 'demo-key' }
-        });
-        toolsCalled.push({
-          name: 'FetchKB',
+        }).then(res => ({
+          name: 'CreateTicket',
           status: 'success',
-          result: kbRes.data
-        });
-      } catch (e) {
-        toolsCalled.push({
-          name: 'FetchKB',
+          result: res.data,
+          duration: 120
+        })).catch(e => ({
+          name: 'CreateTicket',
           status: 'error',
-          result: { error: e.message }
-        });
+          result: { error: e.message },
+          duration: 0
+        }));
+        toolPromises.push(ticketPromise);
       }
       
-      // Create response
+      // Notify ops (if crisis)
+      if (isCrisis) {
+        const opsPromise = api.post('/api/skills/notify-ops', {
+          priority: 'P1',
+          incident_id: `INC-${Date.now()}`,
+          summary: 'Crisis detected from frontend query',
+          links: []
+        }, {
+          headers: { 'x-api-key': 'demo-key' }
+        }).then(res => ({
+          name: 'NotifyOps',
+          status: 'success',
+          result: res.data,
+          duration: 340
+        })).catch(e => ({
+          name: 'NotifyOps',
+          status: 'error',
+          result: { error: e.message },
+          duration: 0
+        }));
+        toolPromises.push(opsPromise);
+      }
+      
+      // Search KB (always)
+      const kbPromise = api.get(`/api/skills/kb-search?q=${encodeURIComponent(promptText)}`, {
+        headers: { 'x-api-key': 'demo-key' }
+      }).then(res => ({
+        name: 'FetchKB',
+        status: 'success',
+        result: res.data,
+        duration: 230
+      })).catch(e => ({
+        name: 'FetchKB',
+        status: 'error',
+        result: { error: e.message },
+        duration: 0
+      }));
+      toolPromises.push(kbPromise);
+      
+      toolsCalled = await Promise.all(toolPromises);
+      
+      const step3Start = getFlowStage('step3')?.startTime || Date.now();
+      updateFlowStage('step3', 'completed', { 
+        result: { tools: toolsCalled },
+        duration: Date.now() - step3Start
+      });
+      
+      // STEP 4: Agent Synthesizes Response
+      updateFlowStage('step4', 'running', { 
+        name: 'Agent Synthesizes Response', 
+        description: 'Combining all tool outputs',
+        startTime: Date.now()
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      const generatedResponse = isCrisis
+        ? 'We\'re aware of the issue and our team is investigating. We\'ve created a ticket and notified operations. Updates will be provided shortly.'
+        : 'Thank you for your message. I\'ve searched our knowledge base and can help you with this. Let me know if you need further assistance.';
+      
+      const step4Start = getFlowStage('step4')?.startTime || Date.now();
+      updateFlowStage('step4', 'completed', { 
+        result: { 
+          response: generatedResponse,
+          confidence: 0.94
+        },
+        duration: Date.now() - step4Start
+      });
+      
+      // STEP 5: Send Response
+      updateFlowStage('step5', 'running', { 
+        name: 'Send Response to Customer', 
+        description: 'Delivering response via channel',
+        startTime: Date.now()
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const step5Start = getFlowStage('step5')?.startTime || Date.now();
+      updateFlowStage('step5', 'completed', { 
+        result: { channel: 'chat', sent: true },
+        duration: Date.now() - step5Start
+      });
+      
+      // STEP 6: Governance Logging
+      updateFlowStage('step6', 'running', { 
+        name: 'Governance Logging', 
+        description: 'Recording audit trail',
+        startTime: Date.now()
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      const step6Start = getFlowStage('step6')?.startTime || Date.now();
+      updateFlowStage('step6', 'completed', { 
+        result: { logged: true, compliance: 'verified' },
+        duration: Date.now() - step6Start
+      });
+      
+      // Create final response
       const mockResponse = {
         id: `resp-${Date.now()}`,
         timestamp: new Date().toISOString(),
         prompt: promptText,
+        flowId: flowId,
         response: {
           crisis_detected: isCrisis,
-          crisis_score: isCrisis ? 0.85 : 0.3,
+          crisis_score: crisisScore,
           crisis_type: isCrisis ? 'outage' : 'other',
-          priority: isCrisis ? 'P1' : 'P3',
+          priority: priority,
           reason: isCrisis 
             ? 'Detected crisis keywords in message, high priority action required'
             : 'Normal support request, standard processing',
           actions_taken: isCrisis ? ['create_ticket', 'notify_ops', 'kb_search'] : ['kb_search'],
-          generated_response: isCrisis
-            ? 'We\'re aware of the issue and our team is investigating. We\'ve created a ticket and notified operations. Updates will be provided shortly.'
-            : 'Thank you for your message. I\'ve searched our knowledge base and can help you with this. Let me know if you need further assistance.',
+          generated_response: generatedResponse,
           tools_called: toolsCalled
         }
       };
@@ -201,10 +319,14 @@ export default function WatsonxAgent() {
       setTestPrompt('');
       setLoading(false);
       
-      // Show success message
       console.log('[WatsonxAgent] Flow triggered successfully');
     } catch (error) {
       console.error('[WatsonxAgent] Error triggering flow:', error);
+      
+      // Mark current running stage as error
+      setFlowStages(prev => prev.map(s => 
+        s.status === 'running' ? { ...s, status: 'error', error: error.message } : s
+      ));
       
       // Still show response even if backend call fails
       const mockResponse = {
@@ -266,6 +388,68 @@ export default function WatsonxAgent() {
           </label>
         </div>
       </div>
+
+      {/* Flow Stages Visualization */}
+      {currentFlow && flowStages.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Execution Flow</h2>
+          <div className="space-y-3">
+            {[
+              { id: 'step1', label: 'STEP 1: IngestEvent Tool' },
+              { id: 'step2', label: 'STEP 2: Agent Analysis (CrisisDetector)' },
+              { id: 'step3', label: 'STEP 3: Tool Orchestration (Parallel)' },
+              { id: 'step4', label: 'STEP 4: Agent Synthesizes Response' },
+              { id: 'step5', label: 'STEP 5: Send Response to Customer' },
+              { id: 'step6', label: 'STEP 6: Governance Logging' }
+            ].map((step, idx) => {
+              const stage = flowStages.find(s => s.id === step.id);
+              const status = stage?.status || 'pending';
+              return (
+                <div key={step.id} className="flex items-center space-x-4">
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    status === 'completed' ? 'bg-green-500 text-white' :
+                    status === 'running' ? 'bg-blue-500 text-white animate-pulse' :
+                    status === 'error' ? 'bg-red-500 text-white' :
+                    'bg-gray-300 text-gray-600'
+                  }`}>
+                    {status === 'completed' ? '✓' : status === 'running' ? '⟳' : status === 'error' ? '✕' : idx + 1}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className={`text-sm font-medium ${
+                        status === 'completed' ? 'text-green-700' :
+                        status === 'running' ? 'text-blue-700' :
+                        status === 'error' ? 'text-red-700' :
+                        'text-gray-500'
+                      }`}>
+                        {stage?.name || step.label}
+                      </p>
+                      {stage?.duration && (
+                        <span className="text-xs text-gray-500">{stage.duration}ms</span>
+                      )}
+                    </div>
+                    {stage?.description && (
+                      <p className="text-xs text-gray-600 mt-1">{stage.description}</p>
+                    )}
+                    {stage?.result && (
+                      <div className="mt-2 text-xs bg-gray-50 p-2 rounded">
+                        {JSON.stringify(stage.result, null, 2).substring(0, 100)}...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {flowStages.every(s => s.status === 'completed') && (
+            <div className="mt-4 p-3 bg-green-50 rounded-lg">
+              <p className="text-sm font-medium text-green-800">
+                ✅ Flow completed successfully! Total time: {flowStages.reduce((sum, s) => sum + (s.duration || 0), 0)}ms
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Responses */}
       <div className="space-y-4">

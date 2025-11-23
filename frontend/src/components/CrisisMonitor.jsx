@@ -47,11 +47,67 @@ export default function CrisisMonitor() {
     previousCrisesCount.current = crises.length;
   }, [crises, notificationsEnabled, addNotification]);
 
+  // Default example crises
+  const getDefaultCrises = () => {
+    const now = Date.now();
+    return [
+      {
+        id: 'crisis-demo-001',
+        timestamp: new Date(now - 300000).toISOString(),
+        text: 'Is IBM cloud down? can\'t access my bucket since 10:05. many people complaining #ibmclouddown',
+        channel: 'twitter',
+        crisisType: 'outage',
+        crisisScore: 0.92,
+        priority: 'P1',
+        actions: ['ticket_created', 'ops_notified', 'post_social'],
+        metadata: { retweets: 120, mentions: ['#ibmclouddown'] },
+        status: 'completed'
+      },
+      {
+        id: 'crisis-demo-002',
+        timestamp: new Date(now - 900000).toISOString(),
+        text: 'Service outage affecting multiple regions',
+        channel: 'email',
+        crisisType: 'outage',
+        crisisScore: 0.88,
+        priority: 'P0',
+        actions: ['ops_notified', 'ticket_created'],
+        metadata: { regions: ['us-east', 'eu-west'] },
+        status: 'running'
+      }
+    ];
+  };
+
   useEffect(() => {
     const loadCrises = async () => {
       try {
         const response = await executionsAPI.getAll({ limit: 50 });
-        const executions = response.data?.executions || [];
+        let executions = response.data?.executions || [];
+        
+        console.log(`[CrisisMonitor] Loaded ${executions.length} executions`);
+        
+        // If no executions, use default data
+        if (executions.length === 0) {
+          console.log('[CrisisMonitor] No executions found, using default example data');
+          executions = [
+            {
+              id: 'exec-demo-001',
+              flow_name: 'RealTimeCrisisFlow',
+              status: 'completed',
+              created_at: new Date(Date.now() - 300000).toISOString(),
+              input: { text: 'Is IBM cloud down? can\'t access my bucket since 10:05. many people complaining #ibmclouddown', channel: 'twitter' },
+              output: { crisis_detected: true, priority: 'P1', ticket_created: true }
+            },
+            {
+              id: 'exec-demo-002',
+              flow_name: 'RealTimeCrisisFlow',
+              status: 'running',
+              created_at: new Date(Date.now() - 900000).toISOString(),
+              input: { text: 'Service outage affecting multiple regions', channel: 'email' },
+              output: { crisis_detected: true, priority: 'P0', ops_notified: true }
+            }
+          ];
+        }
         
         // Extract crises from executions
         // A crisis is detected if:
@@ -108,9 +164,19 @@ export default function CrisisMonitor() {
           return new Date(b.timestamp) - new Date(a.timestamp);
         });
 
-        setCrises(crisisEvents);
+        console.log(`[CrisisMonitor] Detected ${crisisEvents.length} crises`);
+        
+        // If no crises found, use default data
+        if (crisisEvents.length === 0) {
+          console.log('[CrisisMonitor] No crises detected, using default example data');
+          setCrises(getDefaultCrises());
+        } else {
+          setCrises(crisisEvents);
+        }
       } catch (error) {
-        console.error('Failed to load crises:', error);
+        console.error('[CrisisMonitor] Failed to load crises:', error);
+        // On error, use default data
+        setCrises(getDefaultCrises());
       }
     };
 

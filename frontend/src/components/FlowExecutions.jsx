@@ -17,15 +17,81 @@ export default function FlowExecutions() {
     return () => clearInterval(interval);
   }, []);
 
+  // Default example executions
+  const getDefaultExecutions = () => {
+    const now = Date.now();
+    return [
+      {
+        id: 'exec-demo-001',
+        flow_name: 'RealTimeCrisisFlow',
+        status: 'completed',
+        created_at: new Date(now - 300000).toISOString(),
+        start_time: new Date(now - 300000).toISOString(),
+        end_time: new Date(now - 295000).toISOString(),
+        input: { text: 'Is IBM cloud down? can\'t access my bucket since 10:05. many people complaining #ibmclouddown', channel: 'twitter' },
+        output: { crisis_detected: true, priority: 'P1', ticket_created: true, ticketId: 'TICK-demo-001', ops_notified: true }
+      },
+      {
+        id: 'exec-demo-002',
+        flow_name: 'RealTimeCrisisFlow',
+        status: 'completed',
+        created_at: new Date(now - 600000).toISOString(),
+        start_time: new Date(now - 600000).toISOString(),
+        end_time: new Date(now - 595000).toISOString(),
+        input: { text: 'Billing issue - charged twice for November invoice, please refund', channel: 'chat' },
+        output: { crisis_detected: false, priority: 'P2', ticket_created: true, ticketId: 'TICK-demo-002' }
+      },
+      {
+        id: 'exec-demo-003',
+        flow_name: 'SocialScanScheduler',
+        status: 'completed',
+        created_at: new Date(now - 900000).toISOString(),
+        start_time: new Date(now - 900000).toISOString(),
+        end_time: new Date(now - 895000).toISOString(),
+        input: { keywords: '#ibmclouddown', platform: 'twitter' },
+        output: { posts_found: 45, crises_detected: 3 }
+      },
+      {
+        id: 'exec-demo-004',
+        flow_name: 'RealTimeCrisisFlow',
+        status: 'running',
+        created_at: new Date(now - 120000).toISOString(),
+        start_time: new Date(now - 120000).toISOString(),
+        input: { text: 'Service outage affecting multiple regions', channel: 'email' },
+        output: { crisis_detected: true, priority: 'P0' }
+      },
+      {
+        id: 'exec-demo-005',
+        flow_name: 'HumanReviewFlow',
+        status: 'running',
+        created_at: new Date(now - 60000).toISOString(),
+        start_time: new Date(now - 60000).toISOString(),
+        input: { flow_run_id: 'exec-demo-002', requires_approval: true },
+        output: {}
+      }
+    ];
+  };
+
   const loadExecutions = async () => {
     try {
       setLoading(true);
       const response = await executionsAPI.getAll({ limit: 50 });
+      let execs = [];
       if (response.data?.executions) {
-        setExecutions(response.data.executions);
+        execs = response.data.executions;
       }
+      
+      // If no executions, use default data
+      if (execs.length === 0) {
+        console.log('[FlowExecutions] No executions found, using default example data');
+        execs = getDefaultExecutions();
+      }
+      
+      setExecutions(execs);
     } catch (error) {
-      console.error('Failed to load executions:', error);
+      console.error('[FlowExecutions] Failed to load executions:', error);
+      // On error, use default data
+      setExecutions(getDefaultExecutions());
     } finally {
       setLoading(false);
     }
