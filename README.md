@@ -5,7 +5,7 @@ An agentic AI system that detects crises in real-time, auto-triages tickets, pro
 ## 🎯 Key Features
 
 - **Real-time Crisis Detection**: Detects outages, PR issues, security incidents in minutes
-- **Intelligent Auto-Triage**: Classifies priority (P0-P4) and determines required actions
+- **Intelligent Auto-Triage**: Classifies priority (P1-P3) and determines required actions
 - **Multi-Channel Response**: Handles Email, Chat, Phone, Social Media, Mobile App, SMS
 - **Governance & Safety**: Validates all automated responses for PII, hallucination, compliance
 - **Human-in-the-Loop**: Escalates to humans when needed, keeps control
@@ -24,36 +24,38 @@ An agentic AI system that detects crises in real-time, auto-triages tickets, pro
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Multi-Channel Inputs                                        │
-│ Email | Chat | Phone | Social Media | Mobile App | SMS      │
+│                 Multi-Channel Inputs                         │
+│  Email | Chat | Phone | Social Media | Mobile App | SMS     │
 └────────────────────┬────────────────────────────────────────┘
                      │
-        ┌────────────▼────────────┐
-        │ watsonx Orchestrate     │
-        │ (Brain)                 │
-        │ Crisis Detection →      │
-        │ Auto-Triage → Response  │
-        └─┬────────┬──────────────┘
-          │        │
-    ┌─────▼────┐ ┌─▼──────────┐ ┌──────────┐
-    │ Granite  │ │ Assistant │ │Discovery │
-    │ NLP      │ │ Chat      │ │KB Search │
-    └─────┬────┘ └─┬──────────┘ └──────────┘
-          │        │
-    ┌─────▼────────▼────────────────────────┐
-    │ External Systems                      │
-    │ Zendesk | Slack | PagerDuty          │
-    │ Twilio | Twitter | Salesforce        │
-    └───────────────────────────────────────┘
+┌────────────────────▼────────────────────────────────────────┐
+│            watsonx Orchestrate (Brain)                       │
+│  Crisis Detection → Auto-Triage → Response → Resolution     │
+└─┬────────┬─────────┬──────────┬────────────┬───────────────┘
+  │        │         │          │            │
+  ▼        ▼         ▼          ▼            ▼
+┌────┐ ┌─────┐ ┌─────────┐ ┌────────┐ ┌──────────┐
+│.ai │ │Asst │ │Discovery│ │.data   │ │Governance│
+│NLP │ │Chat │ │KB Search│ │Analytics│ │Audit    │
+└────┘ └─────┘ └─────────┘ └────────┘ └──────────┘
+  │        │         │          │            │
+  └────────┴─────────┴──────────┴────────────┘
+                     │
+         ┌───────────▼───────────┐
+         │   External Systems    │
+         │ Zendesk | Slack | PagerDuty │
+         │ Twilio | Twitter | Salesforce │
+         └───────────────────────┘
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 22+ and npm
 - IBM Cloud account with watsonx access
 - IBM watsonx Orchestrate enabled
+- Backend deployed to Vercel (or similar platform)
 
 ### Installation
 
@@ -64,141 +66,178 @@ npm install
 
 2. **Configure environment variables:**
 ```bash
-cp .env.example .env
-# Edit .env with your IBM API keys and configuration
+# Create .env file with:
+IBM_APIKEY=your_ibm_api_key
+ORCHESTRATE_TOOL_KEY=your_tool_key
+ORCHESTRATE_FLOW_ID=your_flow_id
+PORT=8080
 ```
 
-3. **Start the backend server:**
+3. **Start the backend server (local):**
 ```bash
 npm start
 ```
 
-The server will run on `http://localhost:5000`
+The server will run on `http://localhost:8080`
 
-### Testing
+## 🎨 Using watsonx Orchestrate UI as Frontend
 
-```bash
-# Test individual endpoints
-node test-payloads.js
+The **watsonx Orchestrate UI** serves as your complete frontend for managing and monitoring ResolveAI 360. You don't need a separate frontend - the Orchestrate UI provides everything you need!
 
-# Or test manually with curl
-curl -X POST http://localhost:5000/api/trigger-flow \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "text": "Is IBM cloud down?",
-    "channel": "twitter",
-    "metadata": {"retweets": 120}
-  }'
+### Accessing watsonx Orchestrate UI
+
+1. **Login to IBM Cloud**: https://cloud.ibm.com
+2. **Navigate to watsonx Orchestrate**: Search for "watsonx Orchestrate" in IBM Cloud dashboard
+3. **Launch Orchestrate**: Click "Launch Orchestrate" or "Open Orchestrate UI"
+
+**Direct URL format:**
+```
+https://dataplatform.cloud.ibm.com/orchestrate
 ```
 
-## 📋 Step-by-Step Setup Guide
+### Orchestrate UI Features
 
-### Step 1: Create Tools in IBM watsonx Orchestrate
+#### 1. **Agents** (Your AI Assistant)
+- **Location**: Left sidebar → **Agents**
+- **What you can do**:
+  - Chat with your ResolveAI 360 agent
+  - Test crisis detection scenarios
+  - View agent responses and tool calls
+  - Monitor agent performance
 
-1. **Open IBM watsonx Orchestrate UI**
-2. **Navigate to Tools → Create Tool**
-3. **Upload OpenAPI Specification:**
-   - Choose "Create with OpenAI" or "Import OpenAPI" (depending on UI)
-   - **Before uploading**: Edit `tools/openapi-spec.json` or `tools/openapi-spec.yaml`
-   - Update the `servers` section with your backend URL:
-     ```json
-     "servers": [
-       {
-         "url": "https://your-backend.com",  // Replace with your actual URL
-         "description": "Production server"
-       }
-     ]
-     ```
-   - Upload `tools/openapi-spec.json` or `tools/openapi-spec.yaml`
-   - watsonx will parse the OpenAPI spec and show available endpoints
-   - Select each endpoint you want to create as a tool
-   - Configure authentication: Set `x-api-key` header value to your `ORCHESTRATE_TOOL_KEY` (store as secret)
+**How to use:**
+1. Click **"Agents"** in sidebar
+2. Select **"ResolveAI 360 CrisisDetector"**
+3. Start chatting - test with crisis scenarios
+4. Watch the agent detect crises, classify priority, and call tools
 
-**Alternative: Manual HTTP Tool Creation**
-   - Choose "HTTP Tool"
-   - Configure each tool manually:
-     - **CreateTicket**: `POST /api/skills/create-ticket`
-     - **PostSocial**: `POST /api/skills/post-social`
-     - **NotifyOps**: `POST /api/skills/notify-ops`
-     - **FetchKB**: `GET /api/skills/kb-search`
-     - **IngestEvent**: `POST /api/skills/ingest-event`
-     - **SocialMediaMonitor**: `GET /api/skills/social-monitor`
-   - Set authentication header: `x-api-key: <ORCHESTRATE_TOOL_KEY>`
+#### 2. **Tools** (Your Backend Endpoints)
+- **Location**: Left sidebar → **Tools**
+- **What you can do**:
+  - View all your backend tools (CreateTicket, PostSocial, etc.)
+  - Test tool connections
+  - See tool execution history
+  - Monitor tool performance
 
-### Step 2: Create AI Skills in Orchestrate
+**How to use:**
+1. Click **"Tools"** in sidebar
+2. See list of all tools
+3. Click on a tool to:
+   - View configuration
+   - Test the tool
+   - See execution logs
+   - Check response times
 
-For each AI skill, create a new AI Skill in Orchestrate:
+#### 3. **Flows** (Your Workflows)
+- **Location**: Left sidebar → **Flows**
+- **What you can do**:
+  - View flow execution history
+  - Monitor flow performance
+  - Test flows with sample payloads
+  - See step-by-step execution details
 
-1. **CrisisDetector**
-   - Copy system prompt from `prompts/crisis-detector-prompt.md`
-   - Set model: Granite-3.1
-   - Temperature: 0.1
-   - Max tokens: 256
-   - Output format: JSON
+**How to use:**
+1. Click **"Flows"** in sidebar
+2. Select your flow (e.g., RealTimeCrisisFlow)
+3. Click **"Test"** or **"Run"**
+4. Enter test payload and watch execution
 
-2. **TriageClassifier**
-   - Copy from `prompts/triage-classifier-prompt.md`
-   - Model: Granite-3.1, Temp: 0.1, Max tokens: 200
+#### 4. **Executions** (Execution History)
+- **Location**: Left sidebar → **Executions**
+- **What you can do**:
+  - View all flow executions
+  - See detailed execution logs
+  - Filter by status, date, flow
+  - Debug failed executions
 
-3. **ResponseComposer**
-   - Copy from `prompts/response-composer-prompt.md`
-   - Model: Granite-3.1 or Llama3-Chat, Temp: 0.35, Max tokens: 220
+### Example: Testing Crisis Detection
 
-4. **SentimentMonitor**
-   - Copy from `prompts/sentiment-monitor-prompt.md`
-   - Model: Granite-3.1, Temp: 0.0, Max tokens: 100
+1. **Open Orchestrate UI** → Go to **Agents**
+2. **Select "ResolveAI 360 CrisisDetector"**
+3. **Test with a crisis scenario:**
+   ```
+   Analyze this crisis: "Is IBM cloud down? can't access my bucket since 10:05. many people complaining #ibmclouddown"
+   ```
+4. **Watch the agent:**
+   - Detect crisis (is_crisis: true, score: 0.92)
+   - Classify priority (P1)
+   - Generate response
+   - Call tools (CreateTicket, PostSocial, NotifyOps)
+5. **View results** in the chat interface
 
-5. **GovernanceAuditor**
-   - Copy from `prompts/governance-auditor-prompt.md`
-   - Model: Granite-3.1, Temp: 0.0, Max tokens: 200
+### Quick Start Prompts
 
-### Step 3: Create Flows in Orchestrate
+Use these prompts in the Orchestrate UI to test your agent:
 
-1. **RealTimeCrisisFlow** (Main flow)
-   - Use Flow Designer or import from `workflows/realtime-crisis-flow.json`
-   - Configure webhook trigger
-   - Wire AI skills and tools as steps
-   - Set decision nodes and branches
+1. **High Severity Outage:**
+   ```
+   Analyze this crisis: "Is IBM cloud down? can't access my bucket since 10:05. many people complaining #ibmclouddown"
+   ```
 
-2. **SocialScanScheduler** (Periodic monitoring)
-   - Configure cron trigger (every 5 minutes)
-   - Wire SocialMediaMonitor tool
-   - Call RealTimeCrisisFlow for detected crises
+2. **PR Crisis:**
+   ```
+   Check if this is a crisis: "Company tweeted wrong numbers and customers are upset; many retweets"
+   ```
 
-3. **HumanReviewFlow** (Review workflow)
-   - Configure webhook trigger
-   - Wire NotifyOps and CreateTicket tools
-   - Set wait node for human approval
+3. **Billing Issue:**
+   ```
+   Analyze this message: "I was charged twice for November invoice, please refund"
+   ```
 
-### Step 4: Deploy Backend
+4. **Normal Request:**
+   ```
+   Is this a crisis?: "My VM crashed, please help debug my config"
+   ```
 
-Deploy your backend to a reachable HTTPS host:
+## 📋 Setup Guide
 
-**Option A: IBM Code Engine**
-```bash
-ibmcloud ce project create --name resolveai360
-ibmcloud ce app create --name resolveai360-backend --source .
-```
+### Step 1: Deploy Backend
 
-**Option B: Render/Heroku**
-```bash
-# Follow platform-specific deployment guides
-```
+Deploy to Vercel (recommended) or any platform:
 
-**Option C: Local with ngrok (for testing)**
-```bash
-ngrok http 5000
-# Use ngrok URL in Orchestrate tool endpoints
-```
-
-### Step 5: Connect Everything
-
-1. **Update tool endpoints** in Orchestrate to point to your deployed backend
-2. **Set environment variables** in your backend:
+1. **Push code to GitHub**
+2. **Import to Vercel**: https://vercel.com
+3. **Set environment variables**:
    - `IBM_APIKEY`
    - `ORCHESTRATE_TOOL_KEY`
    - `ORCHESTRATE_FLOW_ID`
-3. **Test the flow** using test payloads from `test-payloads.json`
+   - `NODE_ENV=production`
+4. **Deploy**
+
+Your backend URL will be: `https://your-app.vercel.app`
+
+### Step 2: Create Tools in watsonx Orchestrate
+
+1. **Go to Tools** → **Create Tool**
+2. **Upload OpenAPI Spec**: Upload `tools/openapi-spec.json`
+   - Update `servers` URL with your backend URL
+3. **Configure Connection**:
+   - Connection ID: `resolveai-360-backend`
+   - Display Name: `ResolveAI 360 Backend`
+   - API Key Location: `header`
+   - Enter API Key: Your `ORCHESTRATE_TOOL_KEY`
+4. **Select all 6 operations** and create tools
+5. **Test each tool** to verify connection
+
+### Step 3: Create Agent in Orchestrate
+
+1. **Go to Agents** → **Create Agent**
+2. **Name**: `ResolveAI 360 CrisisDetector`
+3. **Description**: `Detects if incoming messages signal a company-level crisis`
+4. **Instructions**: Copy from `prompts/crisis-detector-prompt.md` (or use combined instructions)
+5. **Toolset**: Add all 6 tools
+6. **Model**: Granite-3.1 or Llama-3-2-90b
+7. **Save**
+
+### Step 4: Test Your Agent
+
+1. **Open your agent** in Orchestrate UI
+2. **Test with crisis scenarios** from `orchestrate-test-prompts.csv`
+3. **Watch the agent**:
+   - Detect crises
+   - Classify priority
+   - Generate responses
+   - Call tools automatically
 
 ## 📁 Project Structure
 
@@ -206,43 +245,52 @@ ngrok http 5000
 resolveai-360/
 ├── server.js                 # Express backend server
 ├── package.json              # Dependencies
-├── .env.example             # Environment template
-├── test-payloads.json       # Test cases
-├── test-payloads.js         # Test script
+├── vercel.json               # Vercel deployment config
+├── api/
+│   └── index.js             # Vercel serverless entry point
 │
-├── tools/                   # Tool definitions
-│   ├── openai-tools.json    # OpenAI tool definitions (JSON)
-│   └── openai-tools.yaml    # OpenAI tool definitions (YAML)
+├── tools/                    # Tool definitions
+│   ├── openapi-spec.json     # OpenAPI 3.0 spec (for Orchestrate)
+│   └── openapi-spec.yaml     # OpenAPI 3.0 spec (YAML)
 │
-├── prompts/                 # AI skill prompts
+├── prompts/                  # AI skill prompts
 │   ├── crisis-detector-prompt.md
 │   ├── triage-classifier-prompt.md
 │   ├── response-composer-prompt.md
 │   ├── sentiment-monitor-prompt.md
-│   ├── governance-auditor-prompt.md
-│   └── README.md
+│   └── governance-auditor-prompt.md
 │
-└── workflows/               # Flow definitions
-    ├── realtime-crisis-flow.json
-    ├── social-scan-scheduler.json
-    ├── human-review-flow.json
-    └── README.md
+├── workflows/                # Flow definitions
+│   ├── realtime-crisis-flow.json
+│   ├── social-scan-scheduler.json
+│   └── human-review-flow.json
+│
+├── test-payloads.json        # Test cases
+├── test-payloads.js          # Test script
+├── orchestrate-test-prompts.csv  # Test prompts for Orchestrate
+└── frontend/                 # React frontend (optional)
+    └── ...
 ```
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
-See `.env.example` for all required variables:
-
 - `IBM_APIKEY`: Your IBM Cloud API key
 - `ORCHESTRATE_TOOL_KEY`: Shared secret for tool authentication
-- `ORCHESTRATE_FLOW_ID`: Your Orchestrate flow ID
-- `PORT`: Server port (default: 5000)
+- `ORCHESTRATE_FLOW_ID`: Your Orchestrate flow ID (if using flows)
+- `PORT`: Server port (default: 8080, Vercel sets automatically)
 
-### Tool Endpoints
+### Backend URL
 
-All tools are protected with `x-api-key` header. Set `ORCHESTRATE_TOOL_KEY` in your `.env` file.
+After deployment, your backend URL will be:
+```
+https://your-app.vercel.app
+```
+
+Update this in:
+- `tools/openapi-spec.json` → `servers.url`
+- Orchestrate tool connections
 
 ## 🧪 Testing
 
@@ -250,7 +298,7 @@ All tools are protected with `x-api-key` header. Set `ORCHESTRATE_TOOL_KEY` in y
 
 ```bash
 # Create ticket
-curl -X POST http://localhost:5000/api/skills/create-ticket \
+curl -X POST https://your-app.vercel.app/api/skills/create-ticket \
   -H 'x-api-key: your-key' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -261,22 +309,23 @@ curl -X POST http://localhost:5000/api/skills/create-ticket \
   }'
 
 # Search KB
-curl 'http://localhost:5000/api/skills/kb-search?q=500%20error' \
+curl 'https://your-app.vercel.app/api/skills/kb-search?q=outage' \
   -H 'x-api-key: your-key'
 ```
 
-### Test Full Flow
+### Test in Orchestrate UI
 
-```bash
-node test-payloads.js
-```
+1. **Open your agent** in Orchestrate
+2. **Use test prompts** from `orchestrate-test-prompts.csv`
+3. **Watch execution** in real-time
+4. **Check tool calls** and responses
 
 ## 📚 API Reference
 
-### Trigger Flow
+### Health Check
 ```
-POST /api/trigger-flow
-Body: { text, channel, metadata }
+GET /health
+GET /
 ```
 
 ### Tool Endpoints
@@ -288,32 +337,24 @@ Body: { text, channel, metadata }
 - `GET /api/skills/social-monitor` - Monitor social media
 - `POST /api/skills/human-approval` - Human approval callback
 
+### Orchestrate Integration
+- `POST /api/trigger-flow` - Trigger Orchestrate flow
+- `POST /api/orchestrate/callback` - Orchestrate callback endpoint
+- `GET /api/executions` - Get flow executions
+- `GET /api/executions/:id` - Get execution details
+
 ## 🔐 Security
 
-- All tool endpoints require `x-api-key` header
+- All tool endpoints require `x-api-key` header (or allow Orchestrate requests for demo)
 - Store secrets in environment variables (never commit)
-- Use HTTPS in production
+- Use HTTPS in production (Vercel provides automatically)
 - Validate all inputs server-side
-- Implement rate limiting for production
-
-## 🚧 Production Checklist
-
-- [ ] Deploy backend to HTTPS endpoint
-- [ ] Set up environment variables
-- [ ] Configure real integrations (Zendesk, Slack, Twitter, etc.)
-- [ ] Set up database for event storage
-- [ ] Configure monitoring and alerting
-- [ ] Set up CI/CD pipeline
-- [ ] Implement rate limiting
-- [ ] Add authentication/authorization
-- [ ] Set up logging and analytics
-- [ ] Configure backup and disaster recovery
 
 ## 📖 Additional Resources
 
 - [IBM watsonx Orchestrate Documentation](https://www.ibm.com/docs/en/watsonx-orchestrate)
 - [Granite Models Documentation](https://www.ibm.com/docs/en/watsonx-ai)
-- [OpenAI Function Calling Guide](https://platform.openai.com/docs/guides/function-calling)
+- [OpenAPI 3.0 Specification](https://swagger.io/specification/)
 
 ## 🤝 Contributing
 
@@ -328,10 +369,10 @@ MIT
 For issues or questions:
 1. Check the documentation in `/prompts` and `/workflows`
 2. Review test payloads in `test-payloads.json`
-3. Check server logs for errors
+3. Check server logs in Vercel dashboard
 4. Verify environment variables are set correctly
+5. Test tools in Orchestrate UI
 
 ---
 
 **Built with IBM watsonx Orchestrate** 🚀
-
