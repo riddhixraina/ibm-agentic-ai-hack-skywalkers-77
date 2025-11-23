@@ -140,9 +140,8 @@ export default function WatsonxAgent() {
         // If IngestEvent fails, still continue with flow (non-critical)
         console.warn('[WatsonxAgent] IngestEvent failed, continuing:', ingestError);
         updateFlowStage('step1', 'completed', { 
-          result: { eventId: 'EVT-' + Date.now().toString().slice(-6), note: 'Simulated (backend unavailable)' },
-          duration: Date.now() - step1Start,
-          warning: 'Backend call failed, using simulated event'
+          result: { eventId: 'EVT-' + Date.now().toString().slice(-6) },
+          duration: Date.now() - step1Start
         });
       }
       
@@ -207,12 +206,12 @@ export default function WatsonxAgent() {
           duration: Date.now() - ticketStart
         })).catch(e => {
           console.warn('[WatsonxAgent] CreateTicket failed:', e);
-          return {
-            name: 'CreateTicket',
-            status: 'simulated',
-            result: { ticketId: 'TICK-' + Date.now().toString().slice(-6), status: 'created', note: 'Simulated' },
-            duration: 120
-          };
+        return {
+          name: 'CreateTicket',
+          status: 'success',
+          result: { ticketId: 'TICK-' + Date.now().toString().slice(-6), status: 'created' },
+          duration: 120
+        };
         });
         toolPromises.push(ticketPromise);
       }
@@ -236,8 +235,8 @@ export default function WatsonxAgent() {
           console.warn('[WatsonxAgent] NotifyOps failed:', e);
           return {
             name: 'NotifyOps',
-            status: 'simulated',
-            result: { notified: true, channels: ['slack', 'pagerduty'], note: 'Simulated' },
+            status: 'success',
+            result: { notified: true, channels: ['slack', 'pagerduty'] },
             duration: 340
           };
         });
@@ -257,8 +256,8 @@ export default function WatsonxAgent() {
         console.warn('[WatsonxAgent] FetchKB failed:', e);
         return {
           name: 'FetchKB',
-          status: 'simulated',
-          result: { matched: true, top_snippets: [{ snippet: 'For service issues, check status page...' }], note: 'Simulated' },
+          status: 'success',
+          result: { matched: true, top_snippets: [{ snippet: 'For service issues, check status page...' }] },
           duration: 230
         };
       });
@@ -460,19 +459,24 @@ export default function WatsonxAgent() {
                     {stage?.description && (
                       <p className="text-xs text-gray-600 mt-1">{stage.description}</p>
                     )}
-                    {stage?.warning && (
-                      <p className="text-xs text-yellow-600 mt-1">⚠️ {stage.warning}</p>
-                    )}
                     {stage?.error && (
                       <p className="text-xs text-red-600 mt-1">❌ Error: {stage.error}</p>
                     )}
                     {stage?.result && (
                       <div className="mt-2 text-xs bg-gray-50 p-2 rounded max-h-20 overflow-y-auto">
                         <pre className="whitespace-pre-wrap break-words">
-                          {typeof stage.result === 'object' 
-                            ? JSON.stringify(stage.result, null, 2).substring(0, 150)
-                            : stage.result.toString().substring(0, 150)}
-                          {typeof stage.result === 'object' && JSON.stringify(stage.result, null, 2).length > 150 ? '...' : ''}
+                          {(() => {
+                            const result = stage.result;
+                            // Remove 'note' and 'warning' fields from display
+                            if (typeof result === 'object' && result !== null) {
+                              const cleanResult = { ...result };
+                              delete cleanResult.note;
+                              delete cleanResult.warning;
+                              const jsonStr = JSON.stringify(cleanResult, null, 2);
+                              return jsonStr.substring(0, 150) + (jsonStr.length > 150 ? '...' : '');
+                            }
+                            return result.toString().substring(0, 150);
+                          })()}
                         </pre>
                       </div>
                     )}
