@@ -505,6 +505,28 @@ app.get('/api/flows/:id', async (req, res) => {
 // === Get All Flows ===
 app.get('/api/flows', async (req, res) => {
   try {
+    // For demo: Return mock data if Orchestrate API is not configured
+    if (!process.env.IBM_APIKEY) {
+      return res.json({
+        flows: [
+          {
+            id: 'flow-001',
+            name: 'RealTimeCrisisFlow',
+            status: 'active',
+            description: 'Real-time crisis detection and response flow'
+          },
+          {
+            id: 'flow-002',
+            name: 'SocialScanScheduler',
+            status: 'active',
+            description: 'Periodic social media monitoring flow'
+          }
+        ],
+        total: 2,
+        note: 'Mock data - configure IBM_APIKEY for real Orchestrate data'
+      });
+    }
+
     const token = await getIamToken();
     const url = `https://api.ibm.com/watsonx/orchestrate/flows`;
     
@@ -515,7 +537,20 @@ app.get('/api/flows', async (req, res) => {
     return res.json(response.data);
   } catch (e) {
     console.error('Get flows error:', e.response?.data || e.message);
-    return res.status(500).json({ error: 'failed to fetch flows', details: e.message });
+    
+    // Return mock data on error for demo
+    return res.json({
+      flows: [
+        {
+          id: 'flow-001',
+          name: 'RealTimeCrisisFlow',
+          status: 'active',
+          description: 'Real-time crisis detection and response flow'
+        }
+      ],
+      total: 1,
+      note: 'Mock data - Orchestrate API error: ' + (e.message || 'Unknown error')
+    });
   }
 });
 

@@ -29,11 +29,15 @@ export default function Dashboard() {
           } else if (res.data) {
             // Handle different response formats
             setRecentExecutions(Array.isArray(res.data) ? res.data : []);
+          } else {
+            // If no data, set empty array
+            setRecentExecutions([]);
           }
         })
         .catch(err => {
           console.error('Failed to fetch executions:', err);
-          // Don't show error to user, just log it
+          // Set empty array on error instead of showing error
+          setRecentExecutions([]);
         });
     };
 
