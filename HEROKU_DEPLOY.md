@@ -195,15 +195,31 @@ heroku info
 - **Check dyno hours**: Free tier has 550-1000 hours/month limit
 - **Upgrade if needed**: Or use Eco dyno ($5/month)
 
-## Heroku Free Tier Limits
+## ⚠️ Heroku Pricing (2024)
 
-- **550-1000 dyno hours/month** (shared across apps)
-- **Apps sleep after 30 minutes** of inactivity (free tier)
-- **Eco dyno** ($5/month): No sleep, 1000 hours/month
+**Important:** Heroku discontinued their free tier in November 2022. All plans now require payment.
 
-**To prevent sleeping** (if on free tier):
-- Use a service like https://cron-job.org to ping your app every 20 minutes
-- Or upgrade to Eco dyno
+### Current Pricing Options:
+
+1. **Eco Dyno** - **$5/month** (Recommended for your project)
+   - 1,000 dyno hours/month
+   - Apps don't sleep
+   - Perfect for hackathons and prototypes
+   - **This is the cheapest option**
+
+2. **Basic Dyno** - $7/month
+   - Always-on
+   - Better performance
+
+3. **Standard/Performance** - $25+/month
+   - For production apps with higher traffic
+
+### Free Alternatives:
+- **Render** - Free tier available (see alternatives below)
+- **Fly.io** - Free tier available
+- **IBM Code Engine** - Free tier if you have IBM Cloud account
+
+**See `HEROKU_PRICING.md` for detailed pricing and free alternatives.**
 
 ## Quick Commands Reference
 
