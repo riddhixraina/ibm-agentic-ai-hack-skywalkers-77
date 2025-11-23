@@ -71,19 +71,54 @@ export default function ToolsStatus() {
     try {
       setTesting(tool.id);
       
-      // Test health endpoint first
-      const healthRes = await api.get('/health');
+      // Test health endpoint first to verify backend is reachable
+      try {
+        await api.get('/health');
+      } catch (healthError) {
+        throw new Error('Backend unreachable');
+      }
       
       // For GET endpoints, test with a simple query
       if (tool.method === 'GET') {
         const testUrl = tool.endpoint.includes('?') 
           ? tool.endpoint 
           : `${tool.endpoint}?q=test`;
-        await api.get(testUrl, {
-          headers: {
-            'x-api-key': 'demo-key' // Will be allowed for Orchestrate requests
+        try {
+          await api.get(testUrl, {
+            headers: {
+              'x-api-key': 'XYp7gHzl26ELm3ZSOwof4DuQFvaP5bjNJ0sIiBAxVnq8KCGTdyeh9rRWkUM1ct'
+            }
+          });
+        } catch (getError) {
+          // For GET endpoints, if it's 401, backend is reachable but needs auth
+          // If it's 404 or other, might be a different issue
+          if (getError.response?.status === 401) {
+            // Backend is reachable, just needs proper auth - mark as available
+            setToolsStatus(prev => ({
+              ...prev,
+              [tool.id]: { 
+                status: 'available', 
+                note: 'Backend reachable (auth required)',
+                lastChecked: new Date().toISOString() 
+              }
+            }));
+            return;
           }
-        });
+          throw getError;
+        }
+      } else {
+        // For POST endpoints, just verify backend is reachable
+        // Don't actually call POST endpoints as they might create data
+        // Just mark as available if health check passed
+        setToolsStatus(prev => ({
+          ...prev,
+          [tool.id]: { 
+            status: 'available', 
+            note: 'Backend reachable (POST endpoint - not tested)',
+            lastChecked: new Date().toISOString() 
+          }
+        }));
+        return;
       }
       
       setToolsStatus(prev => ({
@@ -91,11 +126,26 @@ export default function ToolsStatus() {
         [tool.id]: { status: 'connected', lastChecked: new Date().toISOString() }
       }));
     } catch (error) {
+      // Check if it's a network error or backend error
+      const isNetworkError = !error.response;
+      const status = error.response?.status;
+      
+      let errorMessage = 'Connection failed';
+      if (isNetworkError) {
+        errorMessage = 'Backend unreachable - check URL';
+      } else if (status === 401) {
+        errorMessage = 'Authentication required';
+      } else if (status === 404) {
+        errorMessage = 'Endpoint not found';
+      } else {
+        errorMessage = error.response?.data?.error || error.message;
+      }
+      
       setToolsStatus(prev => ({
         ...prev,
         [tool.id]: { 
           status: 'error', 
-          error: error.message,
+          error: errorMessage,
           lastChecked: new Date().toISOString() 
         }
       }));
@@ -107,19 +157,30 @@ export default function ToolsStatus() {
   const checkAllTools = async () => {
     // Check backend health first
     try {
-      await api.get('/health');
-      // If health check passes, mark all tools as potentially available
+      const healthRes = await api.get('/health');
+      // If health check passes, mark all tools as available
       TOOLS.forEach(tool => {
         setToolsStatus(prev => ({
           ...prev,
-          [tool.id]: { status: 'available', lastChecked: new Date().toISOString() }
+          [tool.id]: { 
+            status: 'available', 
+            note: 'Backend reachable',
+            lastChecked: new Date().toISOString() 
+          }
         }));
       });
     } catch (error) {
+      const errorMsg = error.response 
+        ? `Backend error: ${error.response.status}` 
+        : 'Backend unreachable - check URL';
       TOOLS.forEach(tool => {
         setToolsStatus(prev => ({
           ...prev,
-          [tool.id]: { status: 'unavailable', error: 'Backend unreachable' }
+          [tool.id]: { 
+            status: 'unavailable', 
+            error: errorMsg,
+            lastChecked: new Date().toISOString()
+          }
         }));
       });
     }
@@ -158,15 +219,22 @@ export default function ToolsStatus() {
                   {isTesting ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
                   ) : (
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      status?.status === 'connected' || status?.status === 'available'
-                        ? 'bg-green-100 text-green-800'
-                        : status?.status === 'error' || status?.status === 'unavailable'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {status?.status || 'Unknown'}
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        status?.status === 'connected' || status?.status === 'available'
+                          ? 'bg-green-100 text-green-800'
+                          : status?.status === 'error' || status?.status === 'unavailable'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {status?.status || 'Unknown'}
+                      </span>
+                      {status?.error && (
+                        <span className="text-xs text-red-600 mt-1 max-w-[150px] truncate" title={status.error}>
+                          {status.error}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
                 
@@ -180,8 +248,14 @@ export default function ToolsStatus() {
                   {isTesting ? 'Testing...' : 'Test Connection'}
                 </button>
                 
+                {status?.note && (
+                  <p className="text-xs text-blue-600 mt-2">
+                    {status.note}
+                  </p>
+                )}
+                
                 {status?.lastChecked && (
-                  <p className="text-xs text-gray-400 mt-2">
+                  <p className="text-xs text-gray-400 mt-1">
                     Last checked: {new Date(status.lastChecked).toLocaleTimeString()}
                   </p>
                 )}
