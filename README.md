@@ -48,6 +48,103 @@ An agentic AI system that detects crises in real-time, auto-triages tickets, pro
          └───────────────────────┘
 ```
 
+## 🔄 Complete Execution Flow
+
+### End-to-End Process
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  CUSTOMER MESSAGE ARRIVES                                   │
+│  "IBM cloud down? can't access bucket... #ibmclouddown"     │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│  STEP 1: IngestEvent Tool                                   │
+│  • Logs event with timestamp                                │
+│  • Generates event ID: EVT-1705314323                       │
+│  • Publishes to event stream                                │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│  STEP 2: Agent Analysis (CrisisDetector)                    │
+│  • Analyzes text for crisis indicators                      │
+│  • Calculates crisis score: 0.92                            │
+│  • Determines priority: P1                                  │
+│  • Generates action plan                                    │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│  STEP 3: Tool Orchestration (Parallel Execution)            │
+└────────┬─────────┬──────────┬─────────────┬────────────────┘
+         │         │          │             │
+         ▼         ▼          ▼             ▼
+    ┌────────┐ ┌──────┐ ┌─────────┐ ┌──────────┐
+    │CreateTicket │KBSearch│ PostSocial │ NotifyOps│
+    │  45ms   │ 230ms  │  890ms    │  340ms   │
+    │P1:TKT-  │2 articles│Twitter   │PagerDuty │
+    │1705314400│        │posted    │+ Slack   │
+    └────────┘ └──────┘ └─────────┘ └──────────┘
+         │         │          │             │
+         └─────────┴──────────┴─────────────┘
+                     │
+                     ▼
+         ┌───────────────────────┐
+         │   SocialMonitor       │
+         │   450ms               │
+         │   47 mentions found   │
+         └───────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│  STEP 4: Agent Synthesizes Response                         │
+│  • Combines all tool outputs                                │
+│  • Generates customer response                              │
+│  • Confidence: 94%                                          │
+│  • No human escalation needed                               │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│  STEP 5: Send Response to Customer                          │
+│  • Email/Chat/Twitter reply                                 │
+│  • Includes ticket number, workarounds, timeline            │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│  STEP 6: Governance Logging                                 │
+│  • Full audit trail recorded                                │
+│  • watsonx.governance tracks all AI decisions               │
+│  • Compliance verification complete                         │
+└─────────────────────────────────────────────────────────────┘
+                     │
+                     ▼
+                 [DONE] 
+
+         Total Time: 1.2 seconds
+```
+
+### ⏱️ Timeline Breakdown
+
+| Time | Event |
+|------|-------|
+| **10:05:23** | Customer message received |
+| **10:05:23** | IngestEvent logs message (45ms) |
+| **10:05:24** | Agent begins analysis |
+| **10:05:30** | CreateTicket called → TKT-1705314400 (120ms) |
+| **10:05:35** | KBSearch finds 2 articles (230ms) |
+| **10:06:10** | PostSocial publishes Twitter update (890ms) |
+| **10:06:15** | NotifyOps alerts PagerDuty + Slack (340ms) |
+| **10:06:50** | SocialMonitor finds 47 mentions (450ms) |
+| **10:06:55** | Agent generates response (200ms) |
+| **10:06:55** | Response sent to customer |
+| **10:06:55** | Governance logging complete |
+
+**Total Response Time:** 92 seconds (1.5 minutes)
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -79,6 +176,179 @@ npm start
 ```
 
 The server will run on `http://localhost:8080`
+
+### Frontend Setup (Optional)
+
+The React frontend provides a dashboard to monitor and interact with ResolveAI 360.
+
+1. **Navigate to frontend directory:**
+```bash
+cd frontend
+npm install
+```
+
+2. **Configure environment variables:**
+Create `frontend/.env`:
+```bash
+VITE_BACKEND_URL=https://ibm-agentic-ai-hack-skywalkers-77.vercel.app
+```
+
+3. **Start development server:**
+```bash
+npm run dev
+```
+
+The frontend will run on `http://localhost:3000`
+
+4. **Build for production:**
+```bash
+npm run build
+```
+
+5. **Deploy to Vercel:**
+- Set root directory to `frontend`
+- Set environment variable `VITE_BACKEND_URL`
+- Deploy
+
+## 🔌 Backend to Orchestrate Connection
+
+### How It Works
+
+1. **Backend Deployment**: The Express backend is deployed to Vercel and exposes REST API endpoints
+2. **OpenAPI Specification**: Backend tools are defined in `tools/openapi-spec.json` (OpenAPI 3.0 format)
+3. **Tool Registration**: Upload the OpenAPI spec to watsonx Orchestrate → Tools → Create Tool
+4. **Connection Configuration**: 
+   - Set backend URL: `https://ibm-agentic-ai-hack-skywalkers-77.vercel.app`
+   - Configure API key authentication (`x-api-key` header)
+   - Test connection to verify endpoints are reachable
+5. **Agent Integration**: Attach tools to your agent in Orchestrate UI
+
+### Real-time Communication Flow
+
+```
+┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
+│  watsonx        │         │   Backend        │         │   Frontend      │
+│  Orchestrate    │         │   (Vercel)       │         │   (React)       │
+└────────┬────────┘         └────────┬─────────┘         └────────┬────────┘
+         │                            │                            │
+         │  1. Agent calls tool      │                            │
+         ├───────────────────────────►│                            │
+         │                            │                            │
+         │                            │  2. Tool executes          │
+         │                            │     (CreateTicket, etc.)   │
+         │                            │                            │
+         │                            │  3. Socket.io emit         │
+         │                            ├───────────────────────────►│
+         │                            │     (flowUpdate event)     │
+         │                            │                            │
+         │  4. Tool response         │                            │
+         │◄───────────────────────────┤                            │
+         │                            │                            │
+         │                            │  5. Poll /api/executions   │
+         │                            │◄───────────────────────────┤
+         │                            │                            │
+         │                            │  6. Return execution data  │
+         │                            ├───────────────────────────►│
+         │                            │                            │
+```
+
+### Socket.io Real-time Updates
+
+The backend uses **Socket.io** to push real-time updates to the frontend:
+
+1. **When tools are called**: Backend emits `flowUpdate` events
+2. **When events are logged**: Backend emits `newEvent` events  
+3. **When ops are notified**: Backend emits `opsNotification` events
+4. **Frontend receives**: React components listen via `useSocket()` hook
+5. **Auto-updates**: Dashboard, Crisis Monitor, and Event Log update automatically
+
+**Note**: On Vercel (serverless), Socket.io has limitations. The frontend uses **HTTP polling** as a fallback, polling `/api/executions` every 5 seconds.
+
+### Execution Tracking
+
+The backend maintains an **in-memory execution store** that tracks:
+- All tool calls from Orchestrate
+- Execution status and metadata
+- Input/output data
+- Timestamps and durations
+
+This data is returned via `/api/executions` endpoint and displayed in the frontend.
+
+## 🎨 Frontend Application
+
+### React Dashboard
+
+The frontend is a **React application** built with Vite that provides:
+
+- **Real-time Dashboard**: Shows crises detected, active flows, tickets created
+- **Crisis Monitor**: Displays all detected crises with priority and actions
+- **Flow Executions**: Lists all flow executions with status and details
+- **Event Log**: Stream of all events from the system
+- **Tools Status**: Test and monitor all 6 backend tools
+- **watsonx Agent Interface**: Chat interface to interact with the agent
+- **Notifications**: Browser and in-app notifications for new crises
+
+**Frontend URL**: [https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app](https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app)
+
+### Frontend Features
+
+#### 1. **Real-time Data Updates**
+- Polls backend every 5 seconds for new executions
+- Displays live data in dashboard cards
+- Updates automatically when tools are called
+
+#### 2. **Socket.io Integration** (Local Development)
+- Connects to backend via WebSocket
+- Receives real-time events instantly
+- Falls back to HTTP polling on Vercel
+
+#### 3. **Notification System**
+- **Browser Notifications**: Native OS notifications for crises
+- **In-app Notifications**: Toast-style notifications in UI
+- Auto-dismiss after 5 seconds
+
+#### 4. **Data Display Component**
+- Floating button to view raw data
+- Shows health status and executions
+- Useful for debugging
+
+### Frontend Architecture
+
+```
+Frontend (React + Vite)
+├── Components
+│   ├── Dashboard.jsx          # Main dashboard with stats
+│   ├── CrisisMonitor.jsx      # Crisis detection display
+│   ├── FlowExecutions.jsx     # Execution history
+│   ├── EventLog.jsx           # Event stream
+│   ├── ToolsStatus.jsx        # Tool testing interface
+│   ├── WatsonxAgent.jsx       # Agent chat interface
+│   └── NotificationCenter.jsx # In-app notifications
+├── Hooks
+│   ├── useSocket.js           # Socket.io connection
+│   └── useHealthCheck.js      # HTTP health monitoring
+├── Services
+│   └── api.js                 # Axios API client
+└── Contexts
+    └── NotificationContext.jsx # Notification state
+```
+
+### How Frontend Gets Data from Orchestrate
+
+1. **Via Backend API**:
+   - Frontend calls `/api/executions` every 5 seconds
+   - Backend fetches from Orchestrate API (if configured) or returns tracked executions
+   - Frontend displays the data in components
+
+2. **Via Socket.io** (Local only):
+   - Backend emits events when tools are called
+   - Frontend receives via `useSocket()` hook
+   - Components update in real-time
+
+3. **Via Execution Store**:
+   - Backend tracks all tool calls in memory
+   - Frontend polls `/api/executions` to get tracked data
+   - Works even if Orchestrate API is not configured
 
 ## 🎨 Using watsonx Orchestrate UI as Frontend
 
@@ -204,7 +474,9 @@ Deploy to Vercel (recommended) or any platform:
    - `NODE_ENV=production`
 4. **Deploy**
 
-Your backend URL: `https://ibm-agentic-ai-hack-skywalkers-77.vercel.app`
+**Backend deployed at:** [https://ibm-agentic-ai-hack-skywalkers-77.vercel.app](https://ibm-agentic-ai-hack-skywalkers-77.vercel.app)
+
+**Frontend deployed at:** [https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app](https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app)
 
 ### Step 2: Create Tools in watsonx Orchestrate
 
@@ -281,18 +553,22 @@ resolveai-360/
 - `ORCHESTRATE_FLOW_ID`: Your Orchestrate flow ID (if using flows)
 - `PORT`: Server port (default: 8080, Vercel sets automatically)
 
-### Backend URL
+### Deployment URLs
 
-Production backend URL:
-```
-https://ibm-agentic-ai-hack-skywalkers-77.vercel.app
-```
+**Backend (Production):**
+- URL: [https://ibm-agentic-ai-hack-skywalkers-77.vercel.app](https://ibm-agentic-ai-hack-skywalkers-77.vercel.app)
+- Health Check: [https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/health](https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/health)
 
-This is already configured in:
-- `tools/openapi-spec.json` → `servers.url`
-- `tools/openapi-spec.yaml` → `servers.url`
+**Frontend (Production):**
+- URL: [https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app](https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app)
 
-Make sure Orchestrate tool connections use this URL.
+**Configuration:**
+- Backend URL is configured in:
+  - `tools/openapi-spec.json` → `servers.url`
+  - `tools/openapi-spec.yaml` → `servers.url`
+  - `frontend/src/services/api.js` → `VITE_BACKEND_URL` environment variable
+
+Make sure Orchestrate tool connections use the backend URL.
 
 ## 🧪 Testing
 
@@ -313,6 +589,12 @@ curl -X POST https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/api/skills/cre
 # Search KB
 curl 'https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/api/skills/kb-search?q=outage' \
   -H 'x-api-key: your-key'
+
+# Check health
+curl https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/health
+
+# Get executions
+curl https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/api/executions
 ```
 
 ### Test in Orchestrate UI
@@ -366,6 +648,32 @@ This is a reference implementation. Customize for your specific use case.
 
 MIT
 
+## 📱 Frontend Usage
+
+### Accessing the Dashboard
+
+1. **Open the frontend**: [https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app](https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app)
+2. **View Dashboard**: See real-time stats, executions, and system health
+3. **Monitor Crises**: Check the Crisis Monitor tab for detected crises
+4. **View Events**: Check Event Log for all system events
+5. **Test Tools**: Use Tools Status tab to test backend connections
+6. **Interact with Agent**: Use watsonx Agent tab to chat with the agent
+
+### Frontend Features
+
+- **Real-time Updates**: Data refreshes every 5 seconds automatically
+- **Manual Refresh**: Click "Refresh" button to update immediately
+- **Notifications**: Enable browser notifications for crisis alerts
+- **Data Display**: Click "Show Data" button (bottom-right) to view raw data
+- **Connection Status**: Check header for backend connection status
+
+### Troubleshooting Frontend
+
+- **No data showing**: Check browser console (F12) for errors
+- **Connection issues**: Verify `VITE_BACKEND_URL` is set correctly
+- **Notifications not working**: Enable browser notifications in settings
+- **Data not updating**: Check if backend is accessible and polling is working
+
 ## 🆘 Support
 
 For issues or questions:
@@ -374,6 +682,14 @@ For issues or questions:
 3. Check server logs in Vercel dashboard
 4. Verify environment variables are set correctly
 5. Test tools in Orchestrate UI
+6. Check browser console for frontend errors
+7. Verify backend is accessible: [https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/health](https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/health)
+
+## 🔗 Quick Links
+
+- **Backend**: [https://ibm-agentic-ai-hack-skywalkers-77.vercel.app](https://ibm-agentic-ai-hack-skywalkers-77.vercel.app)
+- **Frontend**: [https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app](https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app)
+- **Health Check**: [https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/health](https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/health)
 
 ---
 
