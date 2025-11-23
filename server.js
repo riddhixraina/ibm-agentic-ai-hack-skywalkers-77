@@ -44,19 +44,65 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Simple x-api-key middleware for Orchestrate tool authentication
 // Accepts multiple header name variations for compatibility
 function requireApiKey(req, res, next) {
-  // Try different header name variations
-  const key = req.headers['x-api-key'] || 
-              req.headers['x-api-key'] || 
-              req.headers['X-API-Key'] || 
-              req.headers['X-API-KEY'] ||
-              req.headers['api-key'] ||
-              req.headers['API-Key'] ||
-              req.headers['authorization']?.replace('Bearer ', '')?.replace('ApiKey ', '');
+  // Log all headers for debugging (in production, remove sensitive data)
+  const allHeaders = Object.keys(req.headers);
+  const relevantHeaders = {};
+  allHeaders.forEach(h => {
+    const lower = h.toLowerCase();
+    if (lower.includes('api') || lower.includes('auth') || lower.includes('key')) {
+      relevantHeaders[h] = req.headers[h];
+    }
+  });
+  console.log('🔐 Auth check - Relevant headers:', relevantHeaders);
+  console.log('🔐 Auth check - All headers:', Object.keys(req.headers));
   
-  if (!key || key !== process.env.ORCHESTRATE_TOOL_KEY) {
-    console.log('Auth failed. Headers:', Object.keys(req.headers).filter(h => h.toLowerCase().includes('api') || h.toLowerCase().includes('auth')));
-    return res.status(401).json({ error: 'unauthorized' });
+  // Try different header name variations (case-insensitive check)
+  let key = null;
+  const expectedKey = process.env.ORCHESTRATE_TOOL_KEY;
+  
+  // Check all possible header names (case-insensitive)
+  for (const headerName of Object.keys(req.headers)) {
+    const lowerName = headerName.toLowerCase();
+    if (lowerName === 'x-api-key' || 
+        lowerName === 'api-key' || 
+        lowerName === 'x-apikey' ||
+        lowerName === 'apikey') {
+      key = req.headers[headerName];
+      console.log(`🔑 Found API key in header: ${headerName}`);
+      break;
+    }
   }
+  
+  // Also check Authorization header
+  if (!key && req.headers['authorization']) {
+    const authHeader = req.headers['authorization'];
+    if (authHeader.startsWith('ApiKey ') || authHeader.startsWith('Bearer ')) {
+      key = authHeader.replace('ApiKey ', '').replace('Bearer ', '');
+      console.log(`🔑 Found API key in Authorization header`);
+    } else if (authHeader === expectedKey) {
+      key = authHeader;
+      console.log(`🔑 Found API key as raw Authorization value`);
+    }
+  }
+  
+  if (!key) {
+    console.error('❌ No API key found in request headers');
+    console.error('Available headers:', Object.keys(req.headers));
+    return res.status(401).json({ 
+      error: 'unauthorized',
+      message: 'API key not found in request headers',
+      debug: process.env.NODE_ENV === 'development' ? { receivedHeaders: relevantHeaders } : undefined
+    });
+  }
+  
+  if (key !== expectedKey) {
+    console.error('❌ API key mismatch');
+    console.error('Expected:', expectedKey?.substring(0, 10) + '...');
+    console.error('Received:', key?.substring(0, 10) + '...');
+    return res.status(401).json({ error: 'unauthorized', message: 'Invalid API key' });
+  }
+  
+  console.log('✅ API key validated successfully');
   next();
 }
 
