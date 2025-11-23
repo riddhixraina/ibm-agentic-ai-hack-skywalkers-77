@@ -4,8 +4,8 @@ info:
   description: API endpoints for ResolveAI 360 crisis management system tools
   version: 1.0.0
 servers:
-  - url: https://your-backend.com
-    description: Production server (update with your backend URL)
+  - url: https://ibm-agentic-ai-hack-skywalkers-77.vercel.app
+    description: Vercel production server
 components:
   securitySchemes:
     ApiKeyAuth:
