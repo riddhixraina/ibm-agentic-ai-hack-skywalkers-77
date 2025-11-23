@@ -46,5 +46,7 @@ export const toolsAPI = {
   }),
 };
 
+// Export api instance
+export { api };
 export default api;
 
