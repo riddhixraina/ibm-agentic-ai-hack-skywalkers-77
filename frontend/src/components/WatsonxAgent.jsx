@@ -63,7 +63,7 @@ const EXAMPLE_RESPONSES = [
 export default function WatsonxAgent() {
   const [responses, setResponses] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [testPrompt, setTestPrompt] = useState('Is IBM cloud down? can\'t access my bucket since 10:05. many people complaining #ibmclouddown');
+  const [testPrompt, setTestPrompt] = useState('Payment failed but money was deducted from account');
   const [useExamples, setUseExamples] = useState(true);
   const [currentFlow, setCurrentFlow] = useState(null);
   const [flowStages, setFlowStages] = useState([]);
@@ -155,17 +155,40 @@ export default function WatsonxAgent() {
       
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      const isCrisis = promptText.toLowerCase().includes('down') || 
-                      promptText.toLowerCase().includes('outage') ||
-                      promptText.toLowerCase().includes('crisis') ||
-                      promptText.toLowerCase().includes('emergency') ||
-                      promptText.toLowerCase().includes('critical');
+      // Enhanced crisis detection
+      const textLower = promptText.toLowerCase();
+      const isCrisis = textLower.includes('down') || 
+                      textLower.includes('outage') ||
+                      textLower.includes('crisis') ||
+                      textLower.includes('emergency') ||
+                      textLower.includes('critical') ||
+                      (textLower.includes('payment') && (textLower.includes('failed') || textLower.includes('deducted') || textLower.includes('charged'))) ||
+                      (textLower.includes('billing') && (textLower.includes('error') || textLower.includes('issue')));
       
-      const crisisScore = isCrisis ? 0.92 : 0.12;
-      const priority = isCrisis ? 'P1' : 'P3';
-      const crisisType = isCrisis 
-        ? (promptText.toLowerCase().includes('down') || promptText.toLowerCase().includes('outage') ? 'outage' : 'other')
-        : 'other';
+      // Determine crisis type and score
+      let crisisScore = 0.12;
+      let priority = 'P3';
+      let crisisType = 'other';
+      
+      if (isCrisis) {
+        if (textLower.includes('down') || textLower.includes('outage')) {
+          crisisType = 'outage';
+          crisisScore = 0.92;
+          priority = 'P1';
+        } else if (textLower.includes('payment') || textLower.includes('billing') || textLower.includes('deducted') || textLower.includes('charged')) {
+          crisisType = 'billing';
+          crisisScore = 0.85;
+          priority = 'P1';
+        } else if (textLower.includes('security') || textLower.includes('breach')) {
+          crisisType = 'security';
+          crisisScore = 0.95;
+          priority = 'P0';
+        } else {
+          crisisType = 'other';
+          crisisScore = 0.75;
+          priority = 'P2';
+        }
+      }
       
       updateFlowStage('step2', 'completed', { 
         result: { 
@@ -188,14 +211,17 @@ export default function WatsonxAgent() {
       let toolsCalled = [];
       const toolPromises = [];
       
-      // Create ticket (if crisis)
-      if (isCrisis) {
+      // Create ticket (if crisis or billing issue)
+      if (isCrisis || textLower.includes('payment') || textLower.includes('billing')) {
         const ticketStart = Date.now();
+        const ticketTitle = crisisType === 'billing' 
+          ? 'Billing issue: Payment failed but money deducted'
+          : 'Crisis detected from frontend';
         const ticketPromise = api.post('/api/skills/create-ticket', {
           customer: { id: 'CUST-frontend', name: 'Frontend User' },
-          title: 'Crisis detected from frontend',
+          title: ticketTitle,
           text: promptText,
-          priority: 'P1',
+          priority: priority,
           execution_id: `exec-${Date.now()}`
         }, {
           headers: { 'x-api-key': 'demo-key' }
@@ -206,12 +232,12 @@ export default function WatsonxAgent() {
           duration: Date.now() - ticketStart
         })).catch(e => {
           console.warn('[WatsonxAgent] CreateTicket failed:', e);
-        return {
-          name: 'CreateTicket',
-          status: 'success',
-          result: { ticketId: 'TICK-' + Date.now().toString().slice(-6), status: 'created' },
-          duration: 120
-        };
+          return {
+            name: 'CreateTicket',
+            status: 'success',
+            result: { ticketId: 'TICK-' + Date.now().toString().slice(-6), status: 'created' },
+            duration: 120
+          };
         });
         toolPromises.push(ticketPromise);
       }
@@ -281,9 +307,15 @@ export default function WatsonxAgent() {
       await new Promise(resolve => setTimeout(resolve, 200));
       
       const ticketInfo = toolsCalled.find(t => t.name === 'CreateTicket')?.result?.ticketId || 'TICK-' + Date.now().toString().slice(-6);
-      const generatedResponse = isCrisis
-        ? `We're aware of the issue affecting our services. Our engineering team is investigating and we've created ticket ${ticketInfo}. We've notified operations and will provide updates within 30 minutes. We apologize for the disruption.`
-        : 'Thank you for your message. I\'ve searched our knowledge base and can help you with this. I\'ve created a support ticket for you. Let me know if you need further assistance.';
+      let generatedResponse = '';
+      
+      if (crisisType === 'billing') {
+        generatedResponse = `We sincerely apologize for the billing issue. We've created ticket ${ticketInfo} and our billing team is investigating immediately. The duplicate charge will be refunded within 3-5 business days. We'll send you a confirmation email once the refund is processed.`;
+      } else if (isCrisis) {
+        generatedResponse = `We're aware of the issue affecting our services. Our engineering team is investigating and we've created ticket ${ticketInfo}. We've notified operations and will provide updates within 30 minutes. We apologize for the disruption.`;
+      } else {
+        generatedResponse = 'Thank you for your message. I\'ve searched our knowledge base and can help you with this. I\'ve created a support ticket for you. Let me know if you need further assistance.';
+      }
       
       updateFlowStage('step4', 'completed', { 
         result: { 

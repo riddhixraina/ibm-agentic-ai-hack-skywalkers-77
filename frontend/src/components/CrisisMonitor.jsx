@@ -120,7 +120,9 @@ export default function CrisisMonitor() {
                                  text.includes('outage') || 
                                  text.includes('crisis') ||
                                  text.includes('emergency') ||
-                                 text.includes('critical');
+                                 text.includes('critical') ||
+                                 (text.includes('payment') && (text.includes('failed') || text.includes('deducted'))) ||
+                                 (text.includes('billing') && (text.includes('error') || text.includes('issue')));
           const isHighPriority = exec.output?.priority === 'P0' || 
                                 exec.output?.priority === 'P1' ||
                                 exec.output?.crisis_detected === true;

@@ -108,6 +108,8 @@ export default function Dashboard() {
             return text.includes('down') || 
                    text.includes('outage') ||
                    text.includes('crisis') ||
+                   (text.includes('payment') && (text.includes('failed') || text.includes('deducted'))) ||
+                   (text.includes('billing') && (text.includes('error') || text.includes('issue'))) ||
                    e.output?.crisis_detected === true ||
                    e.output?.priority === 'P0' ||
                    e.output?.priority === 'P1';
