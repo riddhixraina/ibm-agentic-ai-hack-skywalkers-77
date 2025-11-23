@@ -469,6 +469,23 @@ app.get('/api/executions', async (req, res) => {
 // === Get Specific Execution ===
 app.get('/api/executions/:id', async (req, res) => {
   try {
+    // For demo: Return mock data if Orchestrate API is not configured
+    if (!process.env.IBM_APIKEY) {
+      return res.json({
+        id: req.params.id,
+        flow_name: 'RealTimeCrisisFlow',
+        status: 'completed',
+        created_at: new Date().toISOString(),
+        input: { text: 'Is IBM cloud down?', channel: 'twitter' },
+        output: {
+          crisis_detected: true,
+          crisis_score: 0.92,
+          priority: 'P1'
+        },
+        note: 'Mock data - configure IBM_APIKEY for real Orchestrate data'
+      });
+    }
+
     const token = await getIamToken();
     const executionId = req.params.id;
     const url = `https://api.ibm.com/watsonx/orchestrate/executions/${executionId}`;
@@ -480,13 +497,38 @@ app.get('/api/executions/:id', async (req, res) => {
     return res.json(response.data);
   } catch (e) {
     console.error('Get execution error:', e.response?.data || e.message);
-    return res.status(500).json({ error: 'failed to fetch execution', details: e.message });
+    
+    // Return mock data on error for demo
+    return res.json({
+      id: req.params.id,
+      flow_name: 'RealTimeCrisisFlow',
+      status: 'completed',
+      created_at: new Date().toISOString(),
+      input: { text: 'Test message', channel: 'twitter' },
+      output: {
+        crisis_detected: true,
+        crisis_score: 0.85,
+        priority: 'P1'
+      },
+      note: 'Mock data - Orchestrate API error: ' + (e.message || 'Unknown error')
+    });
   }
 });
 
 // === Get Flow Details ===
 app.get('/api/flows/:id', async (req, res) => {
   try {
+    // For demo: Return mock data if Orchestrate API is not configured
+    if (!process.env.IBM_APIKEY) {
+      return res.json({
+        id: req.params.id,
+        name: 'RealTimeCrisisFlow',
+        status: 'active',
+        description: 'Real-time crisis detection and response flow',
+        note: 'Mock data - configure IBM_APIKEY for real Orchestrate data'
+      });
+    }
+
     const token = await getIamToken();
     const flowId = req.params.id;
     const url = `https://api.ibm.com/watsonx/orchestrate/flows/${flowId}`;
@@ -498,7 +540,15 @@ app.get('/api/flows/:id', async (req, res) => {
     return res.json(response.data);
   } catch (e) {
     console.error('Get flow error:', e.response?.data || e.message);
-    return res.status(500).json({ error: 'failed to fetch flow', details: e.message });
+    
+    // Return mock data on error for demo
+    return res.json({
+      id: req.params.id,
+      name: 'RealTimeCrisisFlow',
+      status: 'active',
+      description: 'Real-time crisis detection and response flow',
+      note: 'Mock data - Orchestrate API error: ' + (e.message || 'Unknown error')
+    });
   }
 });
 
