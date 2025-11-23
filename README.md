@@ -204,7 +204,7 @@ Deploy to Vercel (recommended) or any platform:
    - `NODE_ENV=production`
 4. **Deploy**
 
-Your backend URL will be: `https://your-app.vercel.app`
+Your backend URL: `https://ibm-agentic-ai-hack-skywalkers-77.vercel.app`
 
 ### Step 2: Create Tools in watsonx Orchestrate
 
@@ -283,14 +283,16 @@ resolveai-360/
 
 ### Backend URL
 
-After deployment, your backend URL will be:
+Production backend URL:
 ```
-https://your-app.vercel.app
+https://ibm-agentic-ai-hack-skywalkers-77.vercel.app
 ```
 
-Update this in:
+This is already configured in:
 - `tools/openapi-spec.json` → `servers.url`
-- Orchestrate tool connections
+- `tools/openapi-spec.yaml` → `servers.url`
+
+Make sure Orchestrate tool connections use this URL.
 
 ## 🧪 Testing
 
@@ -298,7 +300,7 @@ Update this in:
 
 ```bash
 # Create ticket
-curl -X POST https://your-app.vercel.app/api/skills/create-ticket \
+curl -X POST https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/api/skills/create-ticket \
   -H 'x-api-key: your-key' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -309,7 +311,7 @@ curl -X POST https://your-app.vercel.app/api/skills/create-ticket \
   }'
 
 # Search KB
-curl 'https://your-app.vercel.app/api/skills/kb-search?q=outage' \
+curl 'https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/api/skills/kb-search?q=outage' \
   -H 'x-api-key: your-key'
 ```
 

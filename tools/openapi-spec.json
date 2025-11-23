@@ -8,7 +8,7 @@
   "servers": [
     {
       "url": "https://ibm-agentic-ai-hack-skywalkers-77.vercel.app",
-      "description": "Vercel production server"
+      "description": "ResolveAI 360 Backend - Vercel Production"
     }
   ],
   "components": {

@@ -5,7 +5,7 @@ info:
   version: 1.0.0
 servers:
   - url: https://ibm-agentic-ai-hack-skywalkers-77.vercel.app
-    description: Vercel production server
+    description: ResolveAI 360 Backend - Vercel Production
 components:
   securitySchemes:
     ApiKeyAuth:

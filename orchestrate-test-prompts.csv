@@ -1,4 +1,4 @@
-prompt,expected_answer
+prompt,answer
 "Is IBM cloud down? can't access my bucket since 10:05. many people complaining #ibmclouddown","Crisis detected: Type=outage, Score=0.92, Priority=P1. Actions: CreateTicket, PostSocial, NotifyOps. Response: 'We're aware of an issue affecting storage. Engineers are investigating and we'll update within 30 mins. We're sorry for the disruption.'"
 "Company tweeted wrong numbers and customers are upset; many retweets","Crisis detected: Type=PR, Score=0.78, Priority=P1. Actions: NotifyOps, PostSocial. Response: 'We're investigating the claim and will share a public update soon.'"
 "I was charged twice for November invoice, please refund","Not a crisis (Score=0.2). Priority=P3. Action: CreateTicket. KB search for billing refund info. Response: 'We've started a refund for you. You'll see it in 3–5 business days.'"
