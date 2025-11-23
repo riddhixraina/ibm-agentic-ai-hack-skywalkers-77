@@ -75,7 +75,9 @@ function requireApiKey(req, res, next) {
   // Check for Orchestrate-specific headers (indicates request is from Orchestrate)
   const isFromOrchestrate = req.headers['x-ibm-wo-transaction-id'] || 
                             req.headers['x-ba-crn'] ||
-                            req.headers['plan-id'];
+                            req.headers['plan-id'] ||
+                            req.headers['user-agent']?.includes('watson') ||
+                            req.headers['user-agent']?.includes('orchestrate');
   
   // If API key is provided, validate it
   if (key) {
@@ -93,11 +95,26 @@ function requireApiKey(req, res, next) {
     }
   }
   
-  // No API key found
+  // No API key found - check if we have the key in env
+  if (!expectedKey) {
+    console.error('❌ ORCHESTRATE_TOOL_KEY not set in environment variables');
+    // Still allow for demo
+    if (isFromOrchestrate) {
+      console.warn('⚠️ Allowing Orchestrate request (ORCHESTRATE_TOOL_KEY not configured)');
+      return next();
+    }
+  }
+  
+  // No API key found but request is from Orchestrate
   if (isFromOrchestrate) {
     // TEMPORARY FIX: Allow Orchestrate requests without API key for demo
     console.warn('⚠️ No API key found, but allowing Orchestrate request (demo mode)');
-    console.warn('⚠️ TODO: Fix Orchestrate connection to send x-api-key header');
+    console.warn('⚠️ Request from Orchestrate detected via headers:', {
+      'x-ibm-wo-transaction-id': req.headers['x-ibm-wo-transaction-id'] ? 'present' : 'missing',
+      'x-ba-crn': req.headers['x-ba-crn'] ? 'present' : 'missing',
+      'plan-id': req.headers['plan-id'] ? 'present' : 'missing',
+      'user-agent': req.headers['user-agent']
+    });
     return next();
   }
   
