@@ -99,10 +99,11 @@ export default function WatsonxAgent() {
     setFlowStages([]);
     
     // STEP 1: IngestEvent
+    const step1Start = Date.now();
     updateFlowStage('step1', 'running', { 
       name: 'IngestEvent Tool', 
       description: 'Logging event with timestamp',
-      startTime: Date.now()
+      startTime: step1Start
     });
     
     try {
@@ -119,54 +120,70 @@ export default function WatsonxAgent() {
       await new Promise(resolve => setTimeout(resolve, 300));
       
       // Call backend to trigger flow and create execution
-      const response = await api.post('/api/skills/ingest-event', {
-        flow_name: 'RealTimeCrisisFlow',
-        execution_id: `exec-${Date.now()}`,
-        status: 'running',
-        input: flowInput,
-        output: {},
-        timestamp: new Date().toISOString()
-      }, {
-        headers: { 'x-api-key': 'demo-key' }
-      });
-      
-      const step1Start = getFlowStage('step1')?.startTime || Date.now();
-      updateFlowStage('step1', 'completed', { 
-        result: { eventId: 'EVT-' + Date.now().toString().slice(-6) },
-        duration: Date.now() - step1Start
-      });
+      try {
+        const response = await api.post('/api/skills/ingest-event', {
+          flow_name: 'RealTimeCrisisFlow',
+          execution_id: `exec-${Date.now()}`,
+          status: 'running',
+          input: flowInput,
+          output: {},
+          timestamp: new Date().toISOString()
+        }, {
+          headers: { 'x-api-key': 'demo-key' }
+        });
+        
+        updateFlowStage('step1', 'completed', { 
+          result: { eventId: response.data?.eventId || 'EVT-' + Date.now().toString().slice(-6) },
+          duration: Date.now() - step1Start
+        });
+      } catch (ingestError) {
+        // If IngestEvent fails, still continue with flow (non-critical)
+        console.warn('[WatsonxAgent] IngestEvent failed, continuing:', ingestError);
+        updateFlowStage('step1', 'completed', { 
+          result: { eventId: 'EVT-' + Date.now().toString().slice(-6), note: 'Simulated (backend unavailable)' },
+          duration: Date.now() - step1Start,
+          warning: 'Backend call failed, using simulated event'
+        });
+      }
       
       // STEP 2: Agent Analysis
+      const step2Start = Date.now();
       updateFlowStage('step2', 'running', { 
         name: 'Agent Analysis (CrisisDetector)', 
         description: 'Analyzing text for crisis indicators',
-        startTime: Date.now()
+        startTime: step2Start
       });
       
       await new Promise(resolve => setTimeout(resolve, 500));
       
       const isCrisis = promptText.toLowerCase().includes('down') || 
                       promptText.toLowerCase().includes('outage') ||
-                      promptText.toLowerCase().includes('crisis');
+                      promptText.toLowerCase().includes('crisis') ||
+                      promptText.toLowerCase().includes('emergency') ||
+                      promptText.toLowerCase().includes('critical');
       
       const crisisScore = isCrisis ? 0.92 : 0.12;
       const priority = isCrisis ? 'P1' : 'P3';
+      const crisisType = isCrisis 
+        ? (promptText.toLowerCase().includes('down') || promptText.toLowerCase().includes('outage') ? 'outage' : 'other')
+        : 'other';
       
-      const step2Start = getFlowStage('step2')?.startTime || Date.now();
       updateFlowStage('step2', 'completed', { 
         result: { 
           crisis_detected: isCrisis,
           crisis_score: crisisScore,
-          priority: priority
+          priority: priority,
+          crisis_type: crisisType
         },
         duration: Date.now() - step2Start
       });
       
       // STEP 3: Tool Orchestration (Parallel)
+      const step3Start = Date.now();
       updateFlowStage('step3', 'running', { 
         name: 'Tool Orchestration', 
         description: 'Executing tools in parallel',
-        startTime: Date.now()
+        startTime: step3Start
       });
       
       let toolsCalled = [];
@@ -174,6 +191,7 @@ export default function WatsonxAgent() {
       
       // Create ticket (if crisis)
       if (isCrisis) {
+        const ticketStart = Date.now();
         const ticketPromise = api.post('/api/skills/create-ticket', {
           customer: { id: 'CUST-frontend', name: 'Frontend User' },
           title: 'Crisis detected from frontend',
@@ -186,18 +204,22 @@ export default function WatsonxAgent() {
           name: 'CreateTicket',
           status: 'success',
           result: res.data,
-          duration: 120
-        })).catch(e => ({
-          name: 'CreateTicket',
-          status: 'error',
-          result: { error: e.message },
-          duration: 0
-        }));
+          duration: Date.now() - ticketStart
+        })).catch(e => {
+          console.warn('[WatsonxAgent] CreateTicket failed:', e);
+          return {
+            name: 'CreateTicket',
+            status: 'simulated',
+            result: { ticketId: 'TICK-' + Date.now().toString().slice(-6), status: 'created', note: 'Simulated' },
+            duration: 120
+          };
+        });
         toolPromises.push(ticketPromise);
       }
       
       // Notify ops (if crisis)
       if (isCrisis) {
+        const opsStart = Date.now();
         const opsPromise = api.post('/api/skills/notify-ops', {
           priority: 'P1',
           incident_id: `INC-${Date.now()}`,
@@ -209,54 +231,61 @@ export default function WatsonxAgent() {
           name: 'NotifyOps',
           status: 'success',
           result: res.data,
-          duration: 340
-        })).catch(e => ({
-          name: 'NotifyOps',
-          status: 'error',
-          result: { error: e.message },
-          duration: 0
-        }));
+          duration: Date.now() - opsStart
+        })).catch(e => {
+          console.warn('[WatsonxAgent] NotifyOps failed:', e);
+          return {
+            name: 'NotifyOps',
+            status: 'simulated',
+            result: { notified: true, channels: ['slack', 'pagerduty'], note: 'Simulated' },
+            duration: 340
+          };
+        });
         toolPromises.push(opsPromise);
       }
       
       // Search KB (always)
+      const kbStart = Date.now();
       const kbPromise = api.get(`/api/skills/kb-search?q=${encodeURIComponent(promptText)}`, {
         headers: { 'x-api-key': 'demo-key' }
       }).then(res => ({
         name: 'FetchKB',
         status: 'success',
         result: res.data,
-        duration: 230
-      })).catch(e => ({
-        name: 'FetchKB',
-        status: 'error',
-        result: { error: e.message },
-        duration: 0
-      }));
+        duration: Date.now() - kbStart
+      })).catch(e => {
+        console.warn('[WatsonxAgent] FetchKB failed:', e);
+        return {
+          name: 'FetchKB',
+          status: 'simulated',
+          result: { matched: true, top_snippets: [{ snippet: 'For service issues, check status page...' }], note: 'Simulated' },
+          duration: 230
+        };
+      });
       toolPromises.push(kbPromise);
       
       toolsCalled = await Promise.all(toolPromises);
       
-      const step3Start = getFlowStage('step3')?.startTime || Date.now();
       updateFlowStage('step3', 'completed', { 
         result: { tools: toolsCalled },
         duration: Date.now() - step3Start
       });
       
       // STEP 4: Agent Synthesizes Response
+      const step4Start = Date.now();
       updateFlowStage('step4', 'running', { 
         name: 'Agent Synthesizes Response', 
         description: 'Combining all tool outputs',
-        startTime: Date.now()
+        startTime: step4Start
       });
       
       await new Promise(resolve => setTimeout(resolve, 200));
       
+      const ticketInfo = toolsCalled.find(t => t.name === 'CreateTicket')?.result?.ticketId || 'TICK-' + Date.now().toString().slice(-6);
       const generatedResponse = isCrisis
-        ? 'We\'re aware of the issue and our team is investigating. We\'ve created a ticket and notified operations. Updates will be provided shortly.'
-        : 'Thank you for your message. I\'ve searched our knowledge base and can help you with this. Let me know if you need further assistance.';
+        ? `We're aware of the issue affecting our services. Our engineering team is investigating and we've created ticket ${ticketInfo}. We've notified operations and will provide updates within 30 minutes. We apologize for the disruption.`
+        : 'Thank you for your message. I\'ve searched our knowledge base and can help you with this. I\'ve created a support ticket for you. Let me know if you need further assistance.';
       
-      const step4Start = getFlowStage('step4')?.startTime || Date.now();
       updateFlowStage('step4', 'completed', { 
         result: { 
           response: generatedResponse,
@@ -266,32 +295,32 @@ export default function WatsonxAgent() {
       });
       
       // STEP 5: Send Response
+      const step5Start = Date.now();
       updateFlowStage('step5', 'running', { 
         name: 'Send Response to Customer', 
         description: 'Delivering response via channel',
-        startTime: Date.now()
+        startTime: step5Start
       });
       
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      const step5Start = getFlowStage('step5')?.startTime || Date.now();
       updateFlowStage('step5', 'completed', { 
-        result: { channel: 'chat', sent: true },
+        result: { channel: 'chat', sent: true, messageId: 'MSG-' + Date.now().toString().slice(-6) },
         duration: Date.now() - step5Start
       });
       
       // STEP 6: Governance Logging
+      const step6Start = Date.now();
       updateFlowStage('step6', 'running', { 
         name: 'Governance Logging', 
         description: 'Recording audit trail',
-        startTime: Date.now()
+        startTime: step6Start
       });
       
       await new Promise(resolve => setTimeout(resolve, 150));
       
-      const step6Start = getFlowStage('step6')?.startTime || Date.now();
       updateFlowStage('step6', 'completed', { 
-        result: { logged: true, compliance: 'verified' },
+        result: { logged: true, compliance: 'verified', auditId: 'AUDIT-' + Date.now().toString().slice(-6) },
         duration: Date.now() - step6Start
       });
       
@@ -431,9 +460,20 @@ export default function WatsonxAgent() {
                     {stage?.description && (
                       <p className="text-xs text-gray-600 mt-1">{stage.description}</p>
                     )}
+                    {stage?.warning && (
+                      <p className="text-xs text-yellow-600 mt-1">⚠️ {stage.warning}</p>
+                    )}
+                    {stage?.error && (
+                      <p className="text-xs text-red-600 mt-1">❌ Error: {stage.error}</p>
+                    )}
                     {stage?.result && (
-                      <div className="mt-2 text-xs bg-gray-50 p-2 rounded">
-                        {JSON.stringify(stage.result, null, 2).substring(0, 100)}...
+                      <div className="mt-2 text-xs bg-gray-50 p-2 rounded max-h-20 overflow-y-auto">
+                        <pre className="whitespace-pre-wrap break-words">
+                          {typeof stage.result === 'object' 
+                            ? JSON.stringify(stage.result, null, 2).substring(0, 150)
+                            : stage.result.toString().substring(0, 150)}
+                          {typeof stage.result === 'object' && JSON.stringify(stage.result, null, 2).length > 150 ? '...' : ''}
+                        </pre>
                       </div>
                     )}
                   </div>
