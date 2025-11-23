@@ -363,20 +363,17 @@ app.get('/api/skills/kb-search', requireApiKey, async (req, res) => {
       .filter(item => item.matched)
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
       .slice(0, 5); // Top 5 results
-        category: 'status'
-      }
-    ];
     
-    const queryLower = q.toLowerCase();
-    const snippets = kbData.filter(s => 
-      s.snippet.toLowerCase().includes(queryLower) ||
-      s.category.toLowerCase().includes(queryLower)
-    );
-    
-    res.json({ 
-      matched: snippets.length > 0, 
-      top_snippets: snippets,
-      query: q
+    return res.json({
+      matched: matched.length > 0,
+      top_snippets: matched.map(item => ({
+        id: item.id,
+        snippet: item.snippet,
+        confidence: Math.min(item.relevanceScore, 1.0), // Cap at 1.0
+        category: item.category
+      })),
+      query: q,
+      total_results: matched.length
     });
   } catch (err) {
     console.error('KB search error:', err);
