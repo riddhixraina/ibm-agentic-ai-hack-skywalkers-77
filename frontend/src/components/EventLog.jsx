@@ -1,10 +1,48 @@
 import { useState, useEffect } from 'react';
 import { useSocket } from '../hooks/useSocket';
+import { executionsAPI } from '../services/api';
 
 export default function EventLog() {
-  const { events } = useSocket();
+  const { events: socketEvents } = useSocket();
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [executionEvents, setExecutionEvents] = useState([]);
+  
+  // Generate events from executions data
+  useEffect(() => {
+    const loadEvents = async () => {
+      try {
+        const response = await executionsAPI.getAll({ limit: 50 });
+        const executions = response.data?.executions || [];
+        
+        // Convert executions to events
+        const eventsFromExecutions = executions.map(exec => ({
+          type: 'flowUpdate',
+          timestamp: exec.created_at || new Date().toISOString(),
+          data: {
+            flow_id: exec.id,
+            flow_name: exec.flow_name,
+            status: exec.status,
+            input: exec.input,
+            output: exec.output
+          }
+        }));
+        
+        setExecutionEvents(eventsFromExecutions);
+      } catch (error) {
+        console.error('Failed to load execution events:', error);
+      }
+    };
+    
+    loadEvents();
+    const interval = setInterval(loadEvents, 5000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Combine Socket.io events with execution events
+  const events = [...socketEvents, ...executionEvents].sort((a, b) => 
+    new Date(b.timestamp) - new Date(a.timestamp)
+  );
 
   const eventTypes = ['all', 'flowUpdate', 'newEvent', 'opsNotification', 'humanApproval'];
 

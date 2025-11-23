@@ -11,15 +11,11 @@ export default function FlowExecutions() {
 
   useEffect(() => {
     loadExecutions();
+    
+    // Poll for updates every 5 seconds (Socket.io doesn't work on Vercel)
+    const interval = setInterval(loadExecutions, 5000);
+    return () => clearInterval(interval);
   }, []);
-
-  // Update executions when new flow updates arrive
-  useEffect(() => {
-    const flowUpdates = events.filter(e => e.type === 'flowUpdate');
-    if (flowUpdates.length > 0) {
-      loadExecutions();
-    }
-  }, [events]);
 
   const loadExecutions = async () => {
     try {

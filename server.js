@@ -15,6 +15,39 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
+// In-memory execution store (for demo - in production, use a database)
+const executionStore = {
+  executions: [],
+  addExecution(execution) {
+    // Add execution with timestamp
+    const exec = {
+      ...execution,
+      id: execution.id || `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      created_at: execution.created_at || new Date().toISOString(),
+      start_time: execution.start_time || new Date().toISOString()
+    };
+    this.executions.unshift(exec); // Add to beginning
+    // Keep only last 100 executions
+    if (this.executions.length > 100) {
+      this.executions = this.executions.slice(0, 100);
+    }
+    console.log(`[ExecutionStore] Added execution: ${exec.id} - ${exec.flow_name || 'Unknown'}`);
+    return exec;
+  },
+  getExecutions(limit = 50, offset = 0, status = null) {
+    let filtered = this.executions;
+    if (status) {
+      filtered = filtered.filter(e => e.status === status);
+    }
+    return {
+      executions: filtered.slice(offset, offset + limit),
+      total: filtered.length,
+      limit,
+      offset
+    };
+  }
+};
+
 // Socket.io - optional (won't work on Vercel, but won't break the app)
 let io = null;
 try {
@@ -166,7 +199,7 @@ app.post('/api/trigger-flow', async (req, res) => {
 
 // === Tool: CreateTicket ===
 app.post('/api/skills/create-ticket', requireApiKey, async (req, res) => {
-  const { customer, title, text, priority, attachments } = req.body;
+  const { customer, title, text, priority, attachments, flow_id, execution_id } = req.body;
   
   try {
     // For demo: create stub ticket or call Zendesk API
@@ -174,8 +207,32 @@ app.post('/api/skills/create-ticket', requireApiKey, async (req, res) => {
     const ticketId = 'TICK-' + crypto.randomBytes(4).toString('hex');
     const ticketUrl = `https://demo.zendesk.com/tickets/${ticketId}`;
     
+    // Track execution update if flow_id/execution_id provided
+    if (flow_id || execution_id) {
+      const execId = execution_id || flow_id;
+      const existing = executionStore.executions.find(e => e.id === execId);
+      if (existing) {
+        existing.output = { ...existing.output, ticket_created: true, ticketId, ticketUrl };
+        if (!existing.end_time) {
+          existing.status = 'completed';
+          existing.end_time = new Date().toISOString();
+        }
+      } else {
+        executionStore.addExecution({
+          id: execId,
+          flow_name: 'RealTimeCrisisFlow',
+          status: 'completed',
+          input: { customer, title, text, priority },
+          output: { ticket_created: true, ticketId, ticketUrl },
+          created_at: new Date().toISOString(),
+          start_time: new Date().toISOString(),
+          end_time: new Date().toISOString()
+        });
+      }
+    }
+    
     // Log ticket creation
-    console.log(`[CreateTicket] Priority: ${priority}, Title: ${title}`);
+    console.log(`[CreateTicket] Priority: ${priority}, Title: ${title}, TicketId: ${ticketId}`);
     
     // Store in DB if required (TODO: add database integration)
     
@@ -389,6 +446,20 @@ app.post('/api/skills/ingest-event', requireApiKey, async (req, res) => {
     // TODO: Store in database or object storage (watsonx.data, Cloud Object Storage, etc.)
     const eventId = 'EVT-' + crypto.randomBytes(4).toString('hex');
     
+    // Track execution if event contains execution data
+    if (event.flow_id || event.execution_id || event.flow_name) {
+      executionStore.addExecution({
+        id: event.execution_id || event.flow_id || `exec-${Date.now()}`,
+        flow_name: event.flow_name || 'RealTimeCrisisFlow',
+        status: event.status || 'completed',
+        input: event.input || {},
+        output: event.output || event,
+        created_at: event.timestamp || new Date().toISOString(),
+        start_time: event.start_time || event.timestamp || new Date().toISOString(),
+        end_time: event.end_time || (event.status === 'completed' ? new Date().toISOString() : undefined)
+      });
+    }
+    
     // Push to dashboard via socket
     emitSocketEvent('newEvent', { eventId, event, timestamp: new Date().toISOString() });
     
@@ -434,7 +505,36 @@ app.get('/api/skills/social-monitor', requireApiKey, async (req, res) => {
 // === Orchestrate callback endpoint ===
 app.post('/api/orchestrate/callback', async (req, res) => {
   // Orchestrate will post step updates here; broadcast to UI
-  emitSocketEvent('flowUpdate', { ...req.body, timestamp: new Date().toISOString() });
+  const callbackData = { ...req.body, timestamp: new Date().toISOString() };
+  
+  // Track execution if callback contains execution data
+  if (callbackData.execution_id || callbackData.flow_id || callbackData.flow_name) {
+    const execId = callbackData.execution_id || callbackData.flow_id;
+    const existing = executionStore.executions.find(e => e.id === execId);
+    
+    if (existing) {
+      // Update existing execution
+      existing.status = callbackData.status || existing.status;
+      existing.output = { ...existing.output, ...callbackData.output };
+      if (callbackData.status === 'completed' && !existing.end_time) {
+        existing.end_time = new Date().toISOString();
+      }
+    } else {
+      // Create new execution
+      executionStore.addExecution({
+        id: execId || `exec-${Date.now()}`,
+        flow_name: callbackData.flow_name || 'RealTimeCrisisFlow',
+        status: callbackData.status || 'running',
+        input: callbackData.input || {},
+        output: callbackData.output || {},
+        created_at: callbackData.timestamp || new Date().toISOString(),
+        start_time: callbackData.start_time || callbackData.timestamp || new Date().toISOString(),
+        end_time: callbackData.status === 'completed' ? new Date().toISOString() : undefined
+      });
+    }
+  }
+  
+  emitSocketEvent('flowUpdate', callbackData);
   console.log('[Orchestrate Callback]', req.body);
   res.status(200).send('ok');
 });
@@ -442,71 +542,133 @@ app.post('/api/orchestrate/callback', async (req, res) => {
 // === Get Orchestrate Executions ===
 app.get('/api/executions', async (req, res) => {
   try {
-    // For demo: Return mock data if Orchestrate API is not configured
-    if (!process.env.IBM_APIKEY) {
+    const { limit = 50, offset = 0, status } = req.query;
+    
+    // Get tracked executions from in-memory store
+    const trackedExecs = executionStore.getExecutions(parseInt(limit), parseInt(offset), status);
+    
+    // Try to get real executions from watsonx Orchestrate API
+    let watsonxExecutions = [];
+    if (process.env.IBM_APIKEY) {
+      try {
+        const token = await getIamToken();
+        const params = new URLSearchParams({
+          limit: limit.toString(),
+          offset: offset.toString()
+        });
+        if (status) params.append('status', status);
+        
+        const url = `https://api.ibm.com/watsonx/orchestrate/executions?${params.toString()}`;
+        const response = await axios.get(url, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        watsonxExecutions = response.data?.executions || [];
+      } catch (e) {
+        console.warn('Failed to fetch from watsonx API, using tracked executions:', e.message);
+      }
+    }
+    
+    // Merge tracked executions with watsonx executions (tracked take priority for duplicates)
+    const trackedIds = new Set(trackedExecs.executions.map(e => e.id));
+    const uniqueWatsonxExecs = watsonxExecutions.filter(e => !trackedIds.has(e.id));
+    const allExecutions = [...trackedExecs.executions, ...uniqueWatsonxExecs]
+      .sort((a, b) => new Date(b.created_at || b.start_time || 0) - new Date(a.created_at || a.start_time || 0));
+    
+    // If no executions at all, return mock data for demo
+    if (allExecutions.length === 0 && !process.env.IBM_APIKEY) {
+      const now = Date.now();
       return res.json({
         executions: [
           {
             id: 'exec-001',
             flow_name: 'RealTimeCrisisFlow',
             status: 'completed',
-            created_at: new Date().toISOString(),
-            input: { text: 'Is IBM cloud down?', channel: 'twitter' }
+            created_at: new Date(now - 300000).toISOString(), // 5 minutes ago
+            start_time: new Date(now - 300000).toISOString(),
+            end_time: new Date(now - 295000).toISOString(),
+            input: { text: 'Is IBM cloud down? Can\'t access my buckets for 15 minutes', channel: 'twitter' },
+            output: { crisis_detected: true, priority: 'P1', ticket_created: true }
           },
           {
             id: 'exec-002',
             flow_name: 'RealTimeCrisisFlow',
             status: 'running',
-            created_at: new Date(Date.now() - 60000).toISOString(),
-            input: { text: 'Billing issue', channel: 'chat' }
+            created_at: new Date(now - 120000).toISOString(), // 2 minutes ago
+            start_time: new Date(now - 120000).toISOString(),
+            input: { text: 'Billing issue - charged twice for November', channel: 'chat' },
+            output: {}
+          },
+          {
+            id: 'exec-003',
+            flow_name: 'SocialScanScheduler',
+            status: 'completed',
+            created_at: new Date(now - 600000).toISOString(), // 10 minutes ago
+            start_time: new Date(now - 600000).toISOString(),
+            end_time: new Date(now - 595000).toISOString(),
+            input: { keywords: '#ibmclouddown', platform: 'twitter' },
+            output: { posts_found: 45, crises_detected: 3 }
+          },
+          {
+            id: 'exec-004',
+            flow_name: 'RealTimeCrisisFlow',
+            status: 'completed',
+            created_at: new Date(now - 900000).toISOString(), // 15 minutes ago
+            start_time: new Date(now - 900000).toISOString(),
+            end_time: new Date(now - 895000).toISOString(),
+            input: { text: 'Service outage affecting multiple regions', channel: 'email' },
+            output: { crisis_detected: true, priority: 'P0', ops_notified: true }
+          },
+          {
+            id: 'exec-005',
+            flow_name: 'HumanReviewFlow',
+            status: 'running',
+            created_at: new Date(now - 60000).toISOString(), // 1 minute ago
+            start_time: new Date(now - 60000).toISOString(),
+            input: { flow_run_id: 'exec-002', requires_approval: true },
+            output: {}
+          },
+          {
+            id: 'exec-006',
+            flow_name: 'RealTimeCrisisFlow',
+            status: 'completed',
+            created_at: new Date(now - 1800000).toISOString(), // 30 minutes ago
+            start_time: new Date(now - 1800000).toISOString(),
+            end_time: new Date(now - 1795000).toISOString(),
+            input: { text: 'My VM crashed, help debug my config', channel: 'chat' },
+            output: { crisis_detected: false, priority: 'P3', ticket_created: true }
           }
         ],
-        total: 2,
+        total: 6,
+        limit: parseInt(req.query.limit) || 50,
+        offset: parseInt(req.query.offset) || 0,
         note: 'Mock data - configure IBM_APIKEY for real Orchestrate data'
       });
     }
-
-    const token = await getIamToken();
-    const { limit = 50, offset = 0, status, flowId } = req.query;
     
-    // Build query params
-    const params = new URLSearchParams({
-      limit: limit.toString(),
-      offset: offset.toString()
+    // Return merged executions (tracked + watsonx)
+    return res.json({
+      executions: allExecutions.slice(0, parseInt(limit)),
+      total: allExecutions.length,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      tracked_count: trackedExecs.executions.length,
+      watsonx_count: watsonxExecutions.length
     });
-    if (status) params.append('status', status);
-    if (flowId) params.append('flow_id', flowId);
-    
-    const url = `https://api.ibm.com/watsonx/orchestrate/executions?${params.toString()}`;
-    
-    const response = await axios.get(url, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    
-    return res.json(response.data);
   } catch (e) {
     console.error('Get executions error:', e.response?.data || e.message);
     
-    // Return mock data on error for demo purposes
+    // On error, still return tracked executions
+    const queryLimit = parseInt(req.query.limit) || 50;
+    const queryOffset = parseInt(req.query.offset) || 0;
+    const queryStatus = req.query.status;
+    const trackedExecs = executionStore.getExecutions(queryLimit, queryOffset, queryStatus);
+    
     return res.json({
-      executions: [
-        {
-          id: 'exec-001',
-          flow_name: 'RealTimeCrisisFlow',
-          status: 'completed',
-          created_at: new Date().toISOString(),
-          input: { text: 'Is IBM cloud down?', channel: 'twitter' }
-        },
-        {
-          id: 'exec-002',
-          flow_name: 'RealTimeCrisisFlow',
-          status: 'running',
-          created_at: new Date(Date.now() - 60000).toISOString(),
-          input: { text: 'Billing issue', channel: 'chat' }
-        }
-      ],
-      total: 2,
-      note: 'Mock data - Orchestrate API error: ' + (e.message || 'Unknown error')
+      executions: trackedExecs.executions,
+      total: trackedExecs.total,
+      limit: queryLimit,
+      offset: queryOffset,
+      note: 'Using tracked executions only - Orchestrate API error: ' + (e.message || 'Unknown error')
     });
   }
 });
