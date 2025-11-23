@@ -265,6 +265,86 @@ app.post('/api/orchestrate/callback', async (req, res) => {
   res.status(200).send('ok');
 });
 
+// === Get Orchestrate Executions ===
+app.get('/api/executions', async (req, res) => {
+  try {
+    const token = await getIamToken();
+    const { limit = 50, offset = 0, status, flowId } = req.query;
+    
+    // Build query params
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString()
+    });
+    if (status) params.append('status', status);
+    if (flowId) params.append('flow_id', flowId);
+    
+    const url = `https://api.ibm.com/watsonx/orchestrate/executions?${params.toString()}`;
+    
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    return res.json(response.data);
+  } catch (e) {
+    console.error('Get executions error:', e.response?.data || e.message);
+    return res.status(500).json({ error: 'failed to fetch executions', details: e.message });
+  }
+});
+
+// === Get Specific Execution ===
+app.get('/api/executions/:id', async (req, res) => {
+  try {
+    const token = await getIamToken();
+    const executionId = req.params.id;
+    const url = `https://api.ibm.com/watsonx/orchestrate/executions/${executionId}`;
+    
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    return res.json(response.data);
+  } catch (e) {
+    console.error('Get execution error:', e.response?.data || e.message);
+    return res.status(500).json({ error: 'failed to fetch execution', details: e.message });
+  }
+});
+
+// === Get Flow Details ===
+app.get('/api/flows/:id', async (req, res) => {
+  try {
+    const token = await getIamToken();
+    const flowId = req.params.id;
+    const url = `https://api.ibm.com/watsonx/orchestrate/flows/${flowId}`;
+    
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    return res.json(response.data);
+  } catch (e) {
+    console.error('Get flow error:', e.response?.data || e.message);
+    return res.status(500).json({ error: 'failed to fetch flow', details: e.message });
+  }
+});
+
+// === Get All Flows ===
+app.get('/api/flows', async (req, res) => {
+  try {
+    const token = await getIamToken();
+    const url = `https://api.ibm.com/watsonx/orchestrate/flows`;
+    
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    return res.json(response.data);
+  } catch (e) {
+    console.error('Get flows error:', e.response?.data || e.message);
+    return res.status(500).json({ error: 'failed to fetch flows', details: e.message });
+  }
+});
+
 // === Human approval ===
 app.post('/api/skills/human-approval', requireApiKey, async (req, res) => {
   const { flow_run_id, decision, comments } = req.body;
