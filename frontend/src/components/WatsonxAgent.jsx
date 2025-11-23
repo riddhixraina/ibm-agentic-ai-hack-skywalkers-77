@@ -356,18 +356,24 @@ export default function WatsonxAgent() {
       });
       
       // Create final response
+      const execId = `exec-${Date.now()}`;
+      const ticketInfo = toolsCalled.find(t => t.name === 'CreateTicket')?.result?.ticketId || 'TICK-' + Date.now().toString().slice(-6);
+      
       const mockResponse = {
         id: `resp-${Date.now()}`,
         timestamp: new Date().toISOString(),
         prompt: promptText,
         flowId: flowId,
+        executionId: execId,
         response: {
           crisis_detected: isCrisis,
           crisis_score: crisisScore,
-          crisis_type: isCrisis ? 'outage' : 'other',
+          crisis_type: crisisType,
           priority: priority,
           reason: isCrisis 
-            ? 'Detected crisis keywords in message, high priority action required'
+            ? (crisisType === 'billing' 
+              ? 'Payment/billing issue detected - money deducted but payment failed, requires immediate attention'
+              : 'Detected crisis keywords in message, high priority action required')
             : 'Normal support request, standard processing',
           actions_taken: isCrisis ? ['create_ticket', 'notify_ops', 'kb_search'] : ['kb_search'],
           generated_response: generatedResponse,
@@ -379,7 +385,42 @@ export default function WatsonxAgent() {
       setTestPrompt('');
       setLoading(false);
       
-      console.log('[WatsonxAgent] Flow triggered successfully');
+      // Log execution to backend so it appears in dashboard
+      try {
+        await api.post('/api/skills/ingest-event', {
+          flow_name: 'RealTimeCrisisFlow',
+          execution_id: execId,
+          status: 'completed',
+          input: {
+            text: promptText,
+            channel: 'chat',
+            metadata: {
+              source: 'frontend',
+              timestamp: new Date().toISOString()
+            }
+          },
+          output: {
+            crisis_detected: isCrisis,
+            crisis_score: crisisScore,
+            crisis_type: crisisType,
+            priority: priority,
+            ticket_created: true,
+            ticketId: ticketInfo,
+            ops_notified: isCrisis
+          },
+          timestamp: new Date().toISOString(),
+          start_time: new Date(step1Start).toISOString(),
+          end_time: new Date().toISOString()
+        }, {
+          headers: { 'x-api-key': 'demo-key' }
+        }).catch(e => {
+          console.warn('[WatsonxAgent] Failed to log execution to backend:', e);
+        });
+      } catch (e) {
+        console.warn('[WatsonxAgent] Error logging execution:', e);
+      }
+      
+      console.log('[WatsonxAgent] Flow triggered successfully, execution ID:', execId);
     } catch (error) {
       console.error('[WatsonxAgent] Error triggering flow:', error);
       
