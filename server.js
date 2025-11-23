@@ -442,6 +442,30 @@ app.post('/api/orchestrate/callback', async (req, res) => {
 // === Get Orchestrate Executions ===
 app.get('/api/executions', async (req, res) => {
   try {
+    // For demo: Return mock data if Orchestrate API is not configured
+    if (!process.env.IBM_APIKEY) {
+      return res.json({
+        executions: [
+          {
+            id: 'exec-001',
+            flow_name: 'RealTimeCrisisFlow',
+            status: 'completed',
+            created_at: new Date().toISOString(),
+            input: { text: 'Is IBM cloud down?', channel: 'twitter' }
+          },
+          {
+            id: 'exec-002',
+            flow_name: 'RealTimeCrisisFlow',
+            status: 'running',
+            created_at: new Date(Date.now() - 60000).toISOString(),
+            input: { text: 'Billing issue', channel: 'chat' }
+          }
+        ],
+        total: 2,
+        note: 'Mock data - configure IBM_APIKEY for real Orchestrate data'
+      });
+    }
+
     const token = await getIamToken();
     const { limit = 50, offset = 0, status, flowId } = req.query;
     
@@ -462,7 +486,28 @@ app.get('/api/executions', async (req, res) => {
     return res.json(response.data);
   } catch (e) {
     console.error('Get executions error:', e.response?.data || e.message);
-    return res.status(500).json({ error: 'failed to fetch executions', details: e.message });
+    
+    // Return mock data on error for demo purposes
+    return res.json({
+      executions: [
+        {
+          id: 'exec-001',
+          flow_name: 'RealTimeCrisisFlow',
+          status: 'completed',
+          created_at: new Date().toISOString(),
+          input: { text: 'Is IBM cloud down?', channel: 'twitter' }
+        },
+        {
+          id: 'exec-002',
+          flow_name: 'RealTimeCrisisFlow',
+          status: 'running',
+          created_at: new Date(Date.now() - 60000).toISOString(),
+          input: { text: 'Billing issue', channel: 'chat' }
+        }
+      ],
+      total: 2,
+      note: 'Mock data - Orchestrate API error: ' + (e.message || 'Unknown error')
+    });
   }
 });
 
