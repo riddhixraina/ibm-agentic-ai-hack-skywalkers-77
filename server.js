@@ -454,8 +454,119 @@ app.get('/', (req, res) => {
       executions: '/api/executions',
       flows: '/api/flows'
     },
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    note: 'Tool endpoints require POST method and x-api-key header. Use /test-tool for browser testing.'
   });
+});
+
+// === Test endpoint for browser testing ===
+app.get('/test-tool', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>ResolveAI 360 - Tool Tester</title>
+      <style>
+        body { font-family: Arial; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .endpoint { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .method { display: inline-block; padding: 3px 8px; border-radius: 3px; font-weight: bold; }
+        .post { background: #4CAF50; color: white; }
+        .get { background: #2196F3; color: white; }
+        code { background: #eee; padding: 2px 6px; border-radius: 3px; }
+        .test-btn { background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .test-btn:hover { background: #1976D2; }
+        #result { margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 5px; white-space: pre-wrap; }
+      </style>
+    </head>
+    <body>
+      <h1>🔧 ResolveAI 360 - Tool Tester</h1>
+      <p>Test your backend endpoints. All endpoints require <code>x-api-key</code> header.</p>
+      
+      <div class="endpoint">
+        <h3><span class="method post">POST</span> CreateTicket</h3>
+        <p><code>/api/skills/create-ticket</code></p>
+        <button class="test-btn" onclick="testCreateTicket()">Test CreateTicket</button>
+      </div>
+      
+      <div class="endpoint">
+        <h3><span class="method get">GET</span> FetchKB</h3>
+        <p><code>/api/skills/kb-search?q=test</code></p>
+        <button class="test-btn" onclick="testFetchKB()">Test FetchKB</button>
+      </div>
+      
+      <div class="endpoint">
+        <h3><span class="method get">GET</span> Health Check</h3>
+        <p><code>/health</code></p>
+        <button class="test-btn" onclick="testHealth()">Test Health</button>
+      </div>
+      
+      <div id="result"></div>
+      
+      <script>
+        const API_KEY = 'XYp7gHzl26ELm3ZSOwof4DuQFvaP5bjNJ0sIiBAxVnq8KCGTdyeh9rRWkUM1ct';
+        const BASE_URL = window.location.origin;
+        
+        async function testCreateTicket() {
+          const resultDiv = document.getElementById('result');
+          resultDiv.textContent = 'Testing CreateTicket...';
+          
+          try {
+            const response = await fetch(BASE_URL + '/api/skills/create-ticket', {
+              method: 'POST',
+              headers: {
+                'x-api-key': API_KEY,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                customer: { id: 'TEST', name: 'Test User' },
+                title: 'Test Ticket',
+                text: 'Testing from browser',
+                priority: 'P3'
+              })
+            });
+            
+            const data = await response.json();
+            resultDiv.textContent = '✅ CreateTicket Response:\n' + JSON.stringify(data, null, 2);
+          } catch (error) {
+            resultDiv.textContent = '❌ Error: ' + error.message;
+          }
+        }
+        
+        async function testFetchKB() {
+          const resultDiv = document.getElementById('result');
+          resultDiv.textContent = 'Testing FetchKB...';
+          
+          try {
+            const response = await fetch(BASE_URL + '/api/skills/kb-search?q=500', {
+              method: 'GET',
+              headers: {
+                'x-api-key': API_KEY
+              }
+            });
+            
+            const data = await response.json();
+            resultDiv.textContent = '✅ FetchKB Response:\n' + JSON.stringify(data, null, 2);
+          } catch (error) {
+            resultDiv.textContent = '❌ Error: ' + error.message;
+          }
+        }
+        
+        async function testHealth() {
+          const resultDiv = document.getElementById('result');
+          resultDiv.textContent = 'Testing Health...';
+          
+          try {
+            const response = await fetch(BASE_URL + '/health');
+            const data = await response.json();
+            resultDiv.textContent = '✅ Health Response:\n' + JSON.stringify(data, null, 2);
+          } catch (error) {
+            resultDiv.textContent = '❌ Error: ' + error.message;
+          }
+        }
+      </script>
+    </body>
+    </html>
+  `);
 });
 
 // === Health check ===
