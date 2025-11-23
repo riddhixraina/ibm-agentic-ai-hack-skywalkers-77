@@ -384,6 +384,24 @@ app.post('/api/skills/human-approval', requireApiKey, async (req, res) => {
   }
 });
 
+// === Root endpoint ===
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'ResolveAI 360 Backend',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      triggerFlow: '/api/trigger-flow',
+      tools: '/api/skills/*',
+      orchestrateCallback: '/api/orchestrate/callback',
+      executions: '/api/executions',
+      flows: '/api/flows'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // === Health check ===
 app.get('/health', (req, res) => {
   res.json({ 
