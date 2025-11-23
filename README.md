@@ -1,6 +1,12 @@
 # ResolveAI 360 - Intelligent Customer Service Crisis Management System
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Frontend-blue?style=for-the-badge&logo=vercel)](https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app/)
+[![Backend API](https://img.shields.io/badge/Backend%20API-Vercel-green?style=for-the-badge)](https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/)
+[![Demo Video](https://img.shields.io/badge/Demo%20Video-YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/vLtydiXxLwc)
+
 An agentic AI system that detects crises in real-time, auto-triages tickets, provides instant responses, and orchestrates multi-channel resolution while keeping humans in control.
+
+**🎥 [Watch Demo Video](https://youtu.be/vLtydiXxLwc)** | **🌐 [Live Frontend](https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app/)** | **🔧 [Backend API](https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/)**
 
 ## 🎯 Key Features
 
@@ -687,9 +693,10 @@ For issues or questions:
 
 ## 🔗 Quick Links
 
-- **Backend**: [https://ibm-agentic-ai-hack-skywalkers-77.vercel.app](https://ibm-agentic-ai-hack-skywalkers-77.vercel.app)
-- **Frontend**: [https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app](https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app)
-- **Health Check**: [https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/health](https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/health)
+- **🎥 Demo Video**: [Watch on YouTube](https://youtu.be/vLtydiXxLwc)
+- **🌐 Live Frontend**: [https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app](https://ibm-agentic-ai-hack-skywalkers-77-9.vercel.app)
+- **🔧 Backend API**: [https://ibm-agentic-ai-hack-skywalkers-77.vercel.app](https://ibm-agentic-ai-hack-skywalkers-77.vercel.app)
+- **💚 Health Check**: [https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/health](https://ibm-agentic-ai-hack-skywalkers-77.vercel.app/health)
 
 ---
 
