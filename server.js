@@ -42,9 +42,19 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // Simple x-api-key middleware for Orchestrate tool authentication
+// Accepts multiple header name variations for compatibility
 function requireApiKey(req, res, next) {
-  const key = req.headers['x-api-key'];
+  // Try different header name variations
+  const key = req.headers['x-api-key'] || 
+              req.headers['x-api-key'] || 
+              req.headers['X-API-Key'] || 
+              req.headers['X-API-KEY'] ||
+              req.headers['api-key'] ||
+              req.headers['API-Key'] ||
+              req.headers['authorization']?.replace('Bearer ', '')?.replace('ApiKey ', '');
+  
   if (!key || key !== process.env.ORCHESTRATE_TOOL_KEY) {
+    console.log('Auth failed. Headers:', Object.keys(req.headers).filter(h => h.toLowerCase().includes('api') || h.toLowerCase().includes('auth')));
     return res.status(401).json({ error: 'unauthorized' });
   }
   next();
