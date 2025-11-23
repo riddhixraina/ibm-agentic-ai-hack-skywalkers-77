@@ -24,5 +24,27 @@ export const healthAPI = {
   check: () => api.get('/health'),
 };
 
+export const toolsAPI = {
+  testCreateTicket: (data) => api.post('/api/skills/create-ticket', data, {
+    headers: { 'x-api-key': 'demo-key' }
+  }),
+  testPostSocial: (data) => api.post('/api/skills/post-social', data, {
+    headers: { 'x-api-key': 'demo-key' }
+  }),
+  testNotifyOps: (data) => api.post('/api/skills/notify-ops', data, {
+    headers: { 'x-api-key': 'demo-key' }
+  }),
+  testFetchKB: (query) => api.get(`/api/skills/kb-search?q=${encodeURIComponent(query)}`, {
+    headers: { 'x-api-key': 'demo-key' }
+  }),
+  testIngestEvent: (data) => api.post('/api/skills/ingest-event', data, {
+    headers: { 'x-api-key': 'demo-key' }
+  }),
+  testSocialMonitor: (params) => api.get('/api/skills/social-monitor', {
+    params,
+    headers: { 'x-api-key': 'demo-key' }
+  }),
+};
+
 export default api;
 

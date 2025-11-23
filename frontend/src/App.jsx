@@ -5,6 +5,8 @@ import FlowExecutions from './components/FlowExecutions';
 import CrisisMonitor from './components/CrisisMonitor';
 import EventLog from './components/EventLog';
 import RealTimeStatus from './components/RealTimeStatus';
+import WatsonxAgent from './components/WatsonxAgent';
+import ToolsStatus from './components/ToolsStatus';
 
 function App() {
   const { connected } = useSocket();
@@ -12,6 +14,8 @@ function App() {
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'watsonx', label: 'watsonx Agent', icon: '🤖' },
+    { id: 'tools', label: 'Tools Status', icon: '🔧' },
     { id: 'executions', label: 'Flow Executions', icon: '🔄' },
     { id: 'crises', label: 'Crisis Monitor', icon: '🚨' },
     { id: 'events', label: 'Event Log', icon: '📝' },
@@ -57,6 +61,8 @@ function App() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'dashboard' && <Dashboard />}
+        {activeTab === 'watsonx' && <WatsonxAgent />}
+        {activeTab === 'tools' && <ToolsStatus />}
         {activeTab === 'executions' && <FlowExecutions />}
         {activeTab === 'crises' && <CrisisMonitor />}
         {activeTab === 'events' && <EventLog />}

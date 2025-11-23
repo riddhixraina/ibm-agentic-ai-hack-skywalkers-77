@@ -33,6 +33,7 @@ export function useSocket() {
       newSocket.on('connect_error', (error) => {
         console.warn('Socket.io connection failed (using polling fallback):', error.message);
         setConnected(false);
+        // Don't throw - gracefully degrade to polling
       });
 
     // Listen for flow updates
