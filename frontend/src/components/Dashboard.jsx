@@ -4,7 +4,7 @@ import { executionsAPI, healthAPI } from '../services/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard() {
-  const { events } = useSocket();
+  const { events, connected } = useSocket();
   const [stats, setStats] = useState({
     totalCrises: 0,
     activeFlows: 0,
