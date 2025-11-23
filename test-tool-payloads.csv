@@ -1,0 +1,15 @@
+tool,endpoint,method,payload,description
+CreateTicket,/api/skills/create-ticket,POST,"{""customer"":{""id"":""CUST001"",""name"":""Test User""},""title"":""Service Outage"",""text"":""Cannot access storage buckets"",""priority"":""P1""}",Test creating high priority ticket
+CreateTicket,/api/skills/create-ticket,POST,"{""customer"":{""id"":""CUST002"",""name"":""John Doe""},""title"":""Billing Issue"",""text"":""Charged twice for invoice"",""priority"":""P3""}",Test creating low priority ticket
+PostSocial,/api/skills/post-social,POST,"{""channel"":""twitter"",""message"":""We're aware of an issue and investigating"",""dry_run"":true}",Test social media post (dry run)
+PostSocial,/api/skills/post-social,POST,"{""channel"":""twitter"",""message"":""Service restored. Thank you for your patience."",""dry_run"":false}",Test actual social media post
+NotifyOps,/api/skills/notify-ops,POST,"{""priority"":""P1"",""incident_id"":""INC-001"",""summary"":""Service outage affecting storage"",""links"":[""https://status.example.com""]}",Test ops notification for P1 incident
+NotifyOps,/api/skills/notify-ops,POST,"{""priority"":""P2"",""incident_id"":""INC-002"",""summary"":""Billing system issue"",""links"":[]}",Test ops notification for P2 incident
+FetchKB,/api/skills/kb-search,GET,"?q=outage",Test knowledge base search for outages
+FetchKB,/api/skills/kb-search,GET,"?q=billing",Test knowledge base search for billing
+FetchKB,/api/skills/kb-search,GET,"?q=500",Test knowledge base search for errors
+IngestEvent,/api/skills/ingest-event,POST,"{""event_type"":""crisis_detected"",""data"":{""crisis_type"":""outage"",""score"":0.92},""metadata"":{""timestamp"":""2025-11-23T12:00:00Z""}}",Test event ingestion for crisis detection
+IngestEvent,/api/skills/ingest-event,POST,"{""event_type"":""ticket_created"",""data"":{""ticket_id"":""TICK-001"",""priority"":""P1""},""metadata"":{""model_version"":""granite-3.1""}}",Test event ingestion for ticket creation
+SocialMonitor,/api/skills/social-monitor,GET,"?platform=twitter&keywords=outage,down",Test social media monitoring for outages
+SocialMonitor,/api/skills/social-monitor,GET,"?platform=twitter&keywords=crisis,complaint",Test social media monitoring for crises
+

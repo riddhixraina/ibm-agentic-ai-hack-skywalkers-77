@@ -1,0 +1,22 @@
+message,channel,expected_crisis,expected_type,expected_priority,description
+Is IBM cloud down? can't access my bucket since 10:05. many people complaining #ibmclouddown,twitter,true,outage,P1,High severity outage with social media spike
+Company tweeted wrong numbers and customers are upset; many retweets,twitter,true,PR,P1,PR crisis with high engagement
+I was charged twice for November invoice please refund,chat,false,billing,P3,Low priority billing issue
+My VM crashed please help debug my config,chat,false,other,P3,Normal support request
+Product defect caused injury to multiple customers social media exploding,social,true,safety,P1,Safety crisis with public visibility
+Service is completely unavailable for the past hour many users affected,email,true,outage,P1,Service outage affecting multiple users
+I'm frustrated my product keeps failing,chat,false,other,P3,Low priority complaint
+Security breach detected unauthorized access to customer data,email,true,security,P1,Critical security incident
+Billing system charged me 3 times for same service,chat,true,billing,P2,Moderate priority billing issue
+Can't login to my account for 2 days,chat,false,other,P3,Standard support request
+Service outage affecting all regions status page shows investigation,twitter,true,outage,P1,Global outage with status page confirmation
+Wrong pricing information posted on website customers complaining,twitter,true,PR,P1,PR issue with public visibility
+Need help with configuration,chat,false,other,P3,Standard technical support
+Payment failed but money was deducted from account,chat,true,billing,P2,Billing issue requiring investigation
+Multiple users reporting same issue on social media,twitter,true,outage,P1,Outage with social media confirmation
+Just a question about features,chat,false,other,P3,General inquiry
+Critical bug causing data loss for enterprise customers,email,true,safety,P1,Safety issue with data loss
+Service slow but still working,chat,false,other,P3,Performance issue
+Account locked after suspicious activity,chat,true,security,P2,Security issue requiring attention
+Feature request for new functionality,chat,false,other,P3,Feature request
+

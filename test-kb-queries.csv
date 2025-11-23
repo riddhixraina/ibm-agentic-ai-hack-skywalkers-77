@@ -1,0 +1,33 @@
+query,expected_category,expected_matches,description
+outage,outage,2,Test outage-related queries
+down,outage,2,Test service down queries
+bucket,outage,1,Test storage bucket access issues
+billing,billing,2,Test billing-related queries
+refund,billing,2,Test refund queries
+invoice,billing,2,Test invoice queries
+500,troubleshooting,1,Test error code queries
+error,troubleshooting,1,Test general error queries
+vm crash,troubleshooting,1,Test VM crash queries
+security,security,1,Test security-related queries
+breach,security,1,Test security breach queries
+pr,pr,1,Test public relations queries
+social media,pr,1,Test social media queries
+crisis,crisis,1,Test crisis detection queries
+incident,crisis,1,Test incident escalation queries
+support,support,1,Test general support queries
+ticket,support,1,Test ticket creation queries
+cloud down,outage,2,Test cloud outage queries
+cannot access,outage,1,Test access issues
+duplicate charge,billing,2,Test duplicate billing queries
+cache,troubleshooting,1,Test cache-related queries
+status page,outage,1,Test status page queries
+maintenance,outage,1,Test maintenance queries
+password,security,1,Test password-related queries
+unauthorized,security,1,Test unauthorized access queries
+reputation,pr,1,Test brand reputation queries
+p1,crisis,1,Test priority 1 incident queries
+escalate,crisis,1,Test escalation queries
+documentation,support,1,Test documentation queries
+help,support,1,Test help queries
+storage,outage,1,Test storage-related queries
+
