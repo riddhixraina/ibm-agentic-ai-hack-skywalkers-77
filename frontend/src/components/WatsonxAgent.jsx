@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from '../services/api';
+import { api, flowsAPI } from '../services/api';
 
 // Example responses for demo when watsonx isn't connected
 const EXAMPLE_RESPONSES = [
@@ -63,7 +63,7 @@ const EXAMPLE_RESPONSES = [
 export default function WatsonxAgent() {
   const [responses, setResponses] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [testPrompt, setTestPrompt] = useState('');
+  const [testPrompt, setTestPrompt] = useState('Is IBM cloud down? can\'t access my bucket since 10:05. many people complaining #ibmclouddown');
   const [useExamples, setUseExamples] = useState(true);
 
   useEffect(() => {
@@ -77,23 +77,150 @@ export default function WatsonxAgent() {
     if (!testPrompt.trim()) return;
     
     setLoading(true);
+    const promptText = testPrompt;
     
-    // Simulate watsonx response (replace with actual API call when ready)
-    setTimeout(() => {
+    try {
+      // Trigger flow via backend
+      const flowInput = {
+        text: promptText,
+        channel: 'chat',
+        metadata: {
+          source: 'frontend',
+          timestamp: new Date().toISOString()
+        }
+      };
+      
+      // Call backend to trigger flow and create execution
+      const response = await api.post('/api/skills/ingest-event', {
+        flow_name: 'RealTimeCrisisFlow',
+        execution_id: `exec-${Date.now()}`,
+        status: 'running',
+        input: flowInput,
+        output: {},
+        timestamp: new Date().toISOString()
+      }, {
+        headers: { 'x-api-key': 'demo-key' }
+      });
+      
+      // Also trigger tools based on content
+      const isCrisis = promptText.toLowerCase().includes('down') || 
+                      promptText.toLowerCase().includes('outage') ||
+                      promptText.toLowerCase().includes('crisis');
+      
+      let toolsCalled = [];
+      
+      if (isCrisis) {
+        // Create ticket
+        try {
+          const ticketRes = await api.post('/api/skills/create-ticket', {
+            customer: { id: 'CUST-frontend', name: 'Frontend User' },
+            title: 'Crisis detected from frontend',
+            text: promptText,
+            priority: 'P1',
+            execution_id: `exec-${Date.now()}`
+          }, {
+            headers: { 'x-api-key': 'demo-key' }
+          });
+          toolsCalled.push({
+            name: 'CreateTicket',
+            status: 'success',
+            result: ticketRes.data
+          });
+        } catch (e) {
+          toolsCalled.push({
+            name: 'CreateTicket',
+            status: 'error',
+            result: { error: e.message }
+          });
+        }
+        
+        // Notify ops
+        try {
+          const opsRes = await api.post('/api/skills/notify-ops', {
+            priority: 'P1',
+            incident_id: `INC-${Date.now()}`,
+            summary: 'Crisis detected from frontend query',
+            links: []
+          }, {
+            headers: { 'x-api-key': 'demo-key' }
+          });
+          toolsCalled.push({
+            name: 'NotifyOps',
+            status: 'success',
+            result: opsRes.data
+          });
+        } catch (e) {
+          toolsCalled.push({
+            name: 'NotifyOps',
+            status: 'error',
+            result: { error: e.message }
+          });
+        }
+      }
+      
+      // Search KB
+      try {
+        const kbRes = await api.get(`/api/skills/kb-search?q=${encodeURIComponent(promptText)}`, {
+          headers: { 'x-api-key': 'demo-key' }
+        });
+        toolsCalled.push({
+          name: 'FetchKB',
+          status: 'success',
+          result: kbRes.data
+        });
+      } catch (e) {
+        toolsCalled.push({
+          name: 'FetchKB',
+          status: 'error',
+          result: { error: e.message }
+        });
+      }
+      
+      // Create response
       const mockResponse = {
         id: `resp-${Date.now()}`,
         timestamp: new Date().toISOString(),
-        prompt: testPrompt,
+        prompt: promptText,
         response: {
-          crisis_detected: testPrompt.toLowerCase().includes('down') || testPrompt.toLowerCase().includes('outage'),
-          crisis_score: testPrompt.toLowerCase().includes('down') ? 0.85 : 0.3,
-          crisis_type: testPrompt.toLowerCase().includes('down') ? 'outage' : 'other',
-          priority: testPrompt.toLowerCase().includes('down') ? 'P1' : 'P3',
-          reason: 'Analyzed message content and metadata',
-          actions_taken: testPrompt.toLowerCase().includes('down') ? ['create_ticket', 'notify_ops'] : ['kb_search'],
+          crisis_detected: isCrisis,
+          crisis_score: isCrisis ? 0.85 : 0.3,
+          crisis_type: isCrisis ? 'outage' : 'other',
+          priority: isCrisis ? 'P1' : 'P3',
+          reason: isCrisis 
+            ? 'Detected crisis keywords in message, high priority action required'
+            : 'Normal support request, standard processing',
+          actions_taken: isCrisis ? ['create_ticket', 'notify_ops', 'kb_search'] : ['kb_search'],
+          generated_response: isCrisis
+            ? 'We\'re aware of the issue and our team is investigating. We\'ve created a ticket and notified operations. Updates will be provided shortly.'
+            : 'Thank you for your message. I\'ve searched our knowledge base and can help you with this. Let me know if you need further assistance.',
+          tools_called: toolsCalled
+        }
+      };
+      
+      setResponses(prev => [mockResponse, ...prev]);
+      setTestPrompt('');
+      setLoading(false);
+      
+      // Show success message
+      console.log('[WatsonxAgent] Flow triggered successfully');
+    } catch (error) {
+      console.error('[WatsonxAgent] Error triggering flow:', error);
+      
+      // Still show response even if backend call fails
+      const mockResponse = {
+        id: `resp-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        prompt: promptText,
+        response: {
+          crisis_detected: promptText.toLowerCase().includes('down') || promptText.toLowerCase().includes('outage'),
+          crisis_score: promptText.toLowerCase().includes('down') ? 0.85 : 0.3,
+          crisis_type: promptText.toLowerCase().includes('down') ? 'outage' : 'other',
+          priority: promptText.toLowerCase().includes('down') ? 'P1' : 'P3',
+          reason: 'Analyzed message content (backend unavailable, using local analysis)',
+          actions_taken: promptText.toLowerCase().includes('down') ? ['create_ticket', 'notify_ops'] : ['kb_search'],
           generated_response: 'We\'re investigating the issue and will provide updates shortly.',
           tools_called: [
-            { name: 'CreateTicket', status: 'success', result: { ticketId: `TICK-${Math.random().toString(36).substr(2, 9)}`, status: 'created' } }
+            { name: 'CreateTicket', status: 'pending', result: { note: 'Backend unavailable' } }
           ]
         }
       };
@@ -101,7 +228,7 @@ export default function WatsonxAgent() {
       setResponses(prev => [mockResponse, ...prev]);
       setTestPrompt('');
       setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
